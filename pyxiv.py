@@ -147,61 +147,61 @@ class PyxivBrowser:
     def __del__(self):
         self.session.close()
 
-    def randsleep(self):
+    def _randsleep(self):
         sleep(random.random()*self.__random_max_sleep)
 
-    def get_illust(self, illust_id):
+    def _get_illust(self, illust_id):
         json_ = self.session.get(PyxivBrowser.url_illust.format(illust_id=illust_id)).json()
-        self.randsleep()
+        self._randsleep()
         if json_.get("error") is True:
-            print("Error: get_illust illust_id: {}".format(illust_id), file=sys.stderr)
+            print("Error: _get_illust illust_id: {}".format(illust_id), file=sys.stderr)
             return {}
         else:
             return json_.get("body")
 
-    def get_illust_pages(self, illust_id):
+    def _get_illust_pages(self, illust_id):
         json_ = self.session.get(PyxivBrowser.url_illust_pages.format(illust_id=illust_id)).json()
-        self.randsleep()
+        self._randsleep()
 
         if json_.get("error") is True:
-            print("Error: get_illust_pages illust_id: {}".format(illust_id), file=sys.stderr)
+            print("Error: _get_illust_pages illust_id: {}".format(illust_id), file=sys.stderr)
             return {}
         else:
             return json_.get("body")
 
-    def get_user(self, user_id):
+    def _get_user(self, user_id):
         json_ = self.session.get(PyxivBrowser.url_user.format(user_id=user_id)).json()
-        self.randsleep()
+        self._randsleep()
 
         if json_.get("error") is True:
-            print("Error: get_user user_id: {}".format(user_id), file=sys.stderr)
+            print("Error: _get_user user_id: {}".format(user_id), file=sys.stderr)
             return {}
         else:
             return json_.get("body")
 
-    def get_user_all(self, user_id):
+    def _get_user_all(self, user_id):
         json_ = self.session.get(PyxivBrowser.url_user_all.format(user_id=user_id)).json()
-        self.randsleep()
+        self._randsleep()
 
         if json_.get("error") is True:
-            print("Error: get_user_all user_id: {}".format(user_id), file=sys.stderr)
+            print("Error: _get_user_all user_id: {}".format(user_id), file=sys.stderr)
             return {}
         else:
             return json_.get("body")
 
-    def get_user_top(self, user_id):
+    def _get_user_top(self, user_id):
         json_ = self.session.get(PyxivBrowser.url_user_top.format(user_id=user_id)).json()
-        self.randsleep()
+        self._randsleep()
 
         if json_.get("error") is True:
-            print("Error: get_user_all user_id: {}".format(user_id), file=sys.stderr)
+            print("Error: _get_user_all user_id: {}".format(user_id), file=sys.stderr)
             return {}
         else:
             return json_.get("body")
 
-    def save_illust(self, illust_id, save_path: str):
+    def save_illust(self, illust_id, save_path):
         """save illust"""
-        illust_pages = self.get_illust_pages(illust_id)
+        illust_pages = self._get_illust_pages(illust_id)
         all_pages = {
             page.get("urls").get("original").split("/")[-1]: page.get("urls").get("original")
             for page in illust_pages
@@ -212,22 +212,31 @@ class PyxivBrowser:
         for page_id in pages_need_to_save:
             page_path = PurePath(save_path, page_id)
             response = self.session.get(all_pages[page_id])
-            self.randsleep()
+            self._randsleep()
             print("\tsaving page: {}".format(page_path))
             with open(page_path, "wb") as f:
                 f.write(response.content)
         return True
 
-    def save_illusts(self, illusts_id, save_path):
-        for illust_id in illusts_id:
-            illust = self.get_illust(illust_id)
-            user_id, user_name = illust.get("userId"), illust.get("userName")
-            print("saving illust: {}_{}:{}".format(user_id, user_name, illust_id))
-            illust_save_path = PurePath(save_path, "{}_{}".format(user_id, user_name))
+    def save_illusts(self, illust_ids, save_path):
+        for illust_id in illust_ids:
+            illust = self._get_illust(illust_id)
+            print("saving illust: {}".format(illust_id))
+            illust_save_path = save_path
             if self.config.R18 and "R-18" in [tag.get("tag") for tag in illust.get("tags").get("tags")]:
                 illust_save_path = PurePath(illust_save_path, "R-18")
             os.makedirs(illust_save_path, exist_ok=True)
             self.save_illust(illust_id, illust_save_path)
+        return True
+
+    def save_users(self, user_ids, save_path):
+        for user_id in user_ids:
+            user = self._get_user(user_id)
+            user_all = self._get_user_all(user_id)
+            user_name = user.get("name")
+            all_illusts = list(user_all.get("illusts").keys())
+            print("saving user: {}_{}: {}".format(user_id, user_name, len(all_illusts)))
+            self.save_illusts(all_illusts, PurePath(save_path, "{}_{}".format(user_id, user_name)))
         return True
 
     def download_illusts(self):
@@ -238,14 +247,7 @@ class PyxivBrowser:
     def download_users(self):
         """download all users"""
 
-        for user_id in self.config.users:
-            user = self.get_user(user_id)
-            user_all = self.get_user_all(user_id)
-            user_name = user.get("name")
-            print("saving user: {}_{}".format(user_id, user_name))
-            all_illusts = list(user_all.get("illusts").keys())
-            print("total illusts: {}".format(len(all_illusts)))
-            self.save_illusts(all_illusts, self.config.save_path)
+        self.save_users(self.config.users, self.config.save_path)
         return True
 
     def download_all(self):
