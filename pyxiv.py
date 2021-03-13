@@ -141,13 +141,14 @@ class PyxivBrowser:
         self.session.headers = PyxivBrowser.headers
         self.session.proxies = config.proxies
         self.session.cookies.update(config.cookies)
+        self.__random_max_sleep = 5
         # print(self.session.cookies)
 
     def __del__(self):
         self.session.close()
 
-    def randsleep(self, max_sec=3):
-        sleep(random.random()*max_sec)
+    def randsleep(self):
+        sleep(random.random()*self.__random_max_sleep)
 
     def get_illust(self, illust_id):
         json_ = self.session.get(PyxivBrowser.url_illust.format(illust_id=illust_id)).json()
@@ -224,7 +225,7 @@ class PyxivBrowser:
             print("saving illust: {}_{}:{}".format(user_id, user_name, illust_id))
             illust_save_path = PurePath(save_path, "{}_{}".format(user_id, user_name))
             if self.config.R18 and "R-18" in [tag.get("tag") for tag in illust.get("tags").get("tags")]:
-                illust_save_path = PurePath(save_path, "R-18")
+                illust_save_path = PurePath(illust_save_path, "R-18")
             os.makedirs(illust_save_path, exist_ok=True)
             self.save_illust(illust_id, illust_save_path)
         return True
