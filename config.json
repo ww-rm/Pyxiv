@@ -1,9 +1,15 @@
 {
     "proxies": {
-        "http": "socks5://127.0.0.1:10808",
-        "https": "socks5://127.0.0.1:10808"
+        "http": "http://127.0.0.1:10809",
+        "https": "http://127.0.0.1:10809"
+    },
+    "cookies": {
+
     },
     "illusts": [],
-    "users": [9930155, 6662895, 8189060, 22124330],
-    "save_path": "./image/"
+    "users": [
+        28638684
+    ],
+    "save_path": "./image/",
+    "R18": true
 }

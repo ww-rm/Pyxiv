@@ -1,6 +1,6 @@
-from config import PyxivConfig
-from pyxiv import Pyxiv
 from argparse import ArgumentParser
+
+from pyxiv import PyxivBrowser, PyxivConfig
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -8,6 +8,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = PyxivConfig().load(args.config)
-    pyxiv = Pyxiv(config)
+    pyxiv = PyxivBrowser(config)
 
     pyxiv.download_all()
+    # pyxiv.download_illusts()
+    # pyxiv.download_users()
