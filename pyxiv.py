@@ -237,7 +237,9 @@ class PyxivBrowser:
             user_name = user.get("name")
             all_illusts = list(user_all.get("illusts").keys())
             print("saving user: {}_{}: {}".format(user_id, user_name, len(all_illusts)))
-            self.save_illusts(all_illusts, PurePath(save_path, "{}_{}".format(user_id, user_name)))
+            user_save_path = PurePath(save_path, "{}_{}".format(user_id, user_name))
+            os.makedirs(user_save_path, exist_ok=True)
+            self.save_illusts(all_illusts, user_save_path)
         return True
 
     def download_illusts(self):
