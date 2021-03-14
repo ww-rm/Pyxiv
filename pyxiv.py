@@ -123,8 +123,8 @@ class PyxivBrowser:
     # 获取所有illust的id
     url_host = "https://www.pixiv.net"
     url_user = "https://www.pixiv.net/ajax/user/{user_id}"  # user simple info
-    url_user_all = "https://www.pixiv.net/ajax/user/{user_id}/profile/all"  # user all illusts and details # 9930155
-    url_user_top = "https://www.pixiv.net/ajax/user/{user_id}/profile/top"
+    url_user_profile_all = "https://www.pixiv.net/ajax/user/{user_id}/profile/all"  # user all illusts and details # 9930155
+    url_user_profile_top = "https://www.pixiv.net/ajax/user/{user_id}/profile/top"
     url_user_illusts = "https://www.pixiv.net/ajax/user/{user_id}/illusts?ids[]=84502979"
 
     url_illust = "https://www.pixiv.net/ajax/illust/{illust_id}"  # illust details # 70850475
@@ -146,6 +146,14 @@ class PyxivBrowser:
 
     def __del__(self):
         self.session.close()
+
+    def _login_required(self):
+        if not (
+            "PHPSESSID" in self.session.cookies and
+            "device_token" in self.session.cookies and
+            "privacy_policy_agreement" in self.session.cookies
+        ):
+            raise PermissionError("Error: Cookies not found!")
 
     def _randsleep(self):
         # random sleep [0.1, max) seconds
@@ -181,7 +189,7 @@ class PyxivBrowser:
             return json_.get("body")
 
     def _get_user_all(self, user_id):
-        json_ = self.session.get(PyxivBrowser.url_user_all.format(user_id=user_id)).json()
+        json_ = self.session.get(PyxivBrowser.url_user_profile_all.format(user_id=user_id)).json()
         self._randsleep()
 
         if json_.get("error") is True:
@@ -191,7 +199,7 @@ class PyxivBrowser:
             return json_.get("body")
 
     def _get_user_top(self, user_id):
-        json_ = self.session.get(PyxivBrowser.url_user_top.format(user_id=user_id)).json()
+        json_ = self.session.get(PyxivBrowser.url_user_profile_top.format(user_id=user_id)).json()
         self._randsleep()
 
         if json_.get("error") is True:
