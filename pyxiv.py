@@ -12,7 +12,7 @@ class PyxivConfig:
     setter_warning = "Warning: Failed to set {value}"
 
     def __init__(self):
-        self.__proxies = {"http": "http://127.0.0.1:10809", "https": "http://127.0.0.1:10809"}
+        self.__proxies = {}
         self.__illusts = tuple()
         self.__users = tuple()
         self.__save_path = "."
@@ -148,7 +148,8 @@ class PyxivBrowser:
         self.session.close()
 
     def _randsleep(self):
-        sleep(random.random()*self.__random_max_sleep)
+        # random sleep [0.1, max) seconds
+        sleep(0.1+random.random()*(self.__random_max_sleep-0.1))
 
     def _get_illust(self, illust_id):
         json_ = self.session.get(PyxivBrowser.url_illust.format(illust_id=illust_id)).json()
