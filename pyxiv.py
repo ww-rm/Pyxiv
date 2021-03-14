@@ -153,7 +153,7 @@ class PyxivBrowser:
             "device_token" in self.session.cookies and
             "privacy_policy_agreement" in self.session.cookies
         ):
-            raise PermissionError("Error: Cookies not found!")
+            raise PermissionError("Cookies not found!")
 
     def _randsleep(self):
         # random sleep [0.1, max) seconds
@@ -220,17 +220,22 @@ class PyxivBrowser:
         pages_need_to_save = set(all_pages.keys()) - set(exist_pages)
         for page_id in pages_need_to_save:
             page_path = PurePath(save_path, page_id)
-            response = self.session.get(all_pages[page_id])
-            self._randsleep()
-            print("\tsaving page: {}".format(page_path))
-            with open(page_path, "wb") as f:
-                f.write(response.content)
+            try:
+                response = self.session.get(all_pages[page_id])
+            except Exception as e:
+                print(e.__class__, e, file=sys.stderr)
+                print("\tError: Failed to save page: {}".format(page_path), file=sys.stderr)
+            else:
+                self._randsleep()
+                print("\tInfo: Saving page: {}".format(page_path))
+                with open(page_path, "wb") as f:
+                    f.write(response.content)
         return True
 
     def save_illusts(self, illust_ids, save_path):
         for illust_id in illust_ids:
             illust = self._get_illust(illust_id)
-            print("saving illust: {}".format(illust_id))
+            print("Info: Saving illust: {}".format(illust_id))
             illust_save_path = save_path
             if self.config.R18 and "R-18" in [tag.get("tag") for tag in illust.get("tags").get("tags")]:
                 illust_save_path = PurePath(illust_save_path, "R-18")
@@ -244,7 +249,7 @@ class PyxivBrowser:
             user_all = self._get_user_all(user_id)
             user_name = user.get("name")
             all_illusts = list(user_all.get("illusts").keys())
-            print("saving user: {}_{}: {}".format(user_id, user_name, len(all_illusts)))
+            print("Info: Saving user: {}_{}: {}".format(user_id, user_name, len(all_illusts)))
             user_save_path = PurePath(save_path, "{}_{}".format(user_id, user_name))
             os.makedirs(user_save_path, exist_ok=True)
             self.save_illusts(all_illusts, user_save_path)
