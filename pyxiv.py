@@ -105,7 +105,13 @@ class PyxivBrowser:
     # 获取所有illust的id
     url_host = "https://www.pixiv.net"
 
-    url_top_illust = "https://www.pixiv.net/ajax/top/illust"  # ?mode=all # many many info in index page
+    url_top_illust = "https://www.pixiv.net/ajax/top/illust"  # ?mode=all|r18 # many many info in index page
+
+    url_search_tags = "https://www.pixiv.net/ajax/search/tags/{keyword}"
+    # ?order=date&mode=all&p=1&s_mode=s_tag # param for url_search_*
+    url_search_artworks = "https://www.pixiv.net/ajax/search/artworks/{keyword}"
+    url_search_illustrations = "https://www.pixiv.net/ajax/search/illustrations/{keyword}"  # ?type=illust
+    url_search_manga = "https://www.pixiv.net/ajax/search/manga/{keyword}"
 
     url_user = "https://www.pixiv.net/ajax/user/{user_id}"  # user simple info
     url_user_following = "https://www.pixiv.net/ajax/user/{user_id}/following"  # ?offset=0&limit=24&rest=show
@@ -133,6 +139,8 @@ class PyxivBrowser:
     def __del__(self):
         self.session.close()
 
+    # functions of access api
+
     @wrapper.log_empty_return
     @wrapper.randsleep
     def _get_page(self, page_url) -> bytes:
@@ -142,6 +150,87 @@ class PyxivBrowser:
         except Exception as e:
             print(e.__class__, e, file=sys.stderr)
         return content
+
+    @wrapper.cookies_required
+    @wrapper.log_empty_return
+    @wrapper.randsleep
+    def _get_top_illust(self, mode="all"):
+        """Get top illusts by mode
+
+        Args:
+            mode: "all" means all ages, "r18" means R-18 only
+        """
+        json_ = self.session.get(PyxivBrowser.url_top_illust, params={"mode": mode}).json()
+        return {} if json_.get("error") is True else json_.get("body")
+
+    @wrapper.log_empty_return
+    @wrapper.randsleep
+    def _get_search_artworks(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="all"):
+        """Get search artworks result
+
+        Args:
+            order: "date" means date ascend, "date_d" means date descend
+            mode: "all", "safe", "r18"
+            p: search result page
+            s_mode: "s_tag" partly match tag, "s_tag_full" exactly match tag, "s_tc" match title and character description
+            type_: No need to care
+        """
+        json_ = self.session.get(
+            PyxivBrowser.url_search_artworks.format(keyword=keyword),
+            params={
+                "order": order,
+                "mode": mode,
+                "p": p,
+                "s_mode": s_mode,
+                "type": type_
+            }).json()
+        return {} if json_.get("error") is True else json_.get("body")
+
+    @wrapper.log_empty_return
+    @wrapper.randsleep
+    def _get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="illust"):
+        """Get search illustration or ugoira result
+
+        Args:
+            order: "date" means date ascend, "date_d" means date descend
+            mode: "all", "safe", "r18"
+            p: search result page
+            s_mode: "s_tag" partly match tag, "s_tag_full" exactly match tag, "s_tc" match title and character description
+            type_: "illust", "ugoira", "illust_and_ugoira"
+        """
+        json_ = self.session.get(
+            PyxivBrowser.url_search_illustrations.format(keyword=keyword),
+            params={
+                "order": order,
+                "mode": mode,
+                "p": p,
+                "s_mode": s_mode,
+                "type": type_
+            }).json()
+        return {} if json_.get("error") is True else json_.get("body")
+
+    @wrapper.log_empty_return
+    @wrapper.randsleep
+    def _get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="manga"):
+        """Get search manga result
+
+        Args:
+            order: "date" means date ascend, "date_d" means date descend
+            mode: "all", "safe", "r18"
+            p: search result page
+            s_mode: "s_tag" partly match tag, "s_tag_full" exactly match tag, "s_tc" match title and character description
+            type_: No need to care
+        """
+        json_ = self.session.get(
+            PyxivBrowser.url_search_manga.format(keyword=keyword),
+            params={
+                "order": order,
+                "mode": mode,
+                "p": p,
+                "s_mode": s_mode,
+                "type": type_
+            }).json()
+        return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.log_empty_return
     @wrapper.randsleep
@@ -164,19 +253,39 @@ class PyxivBrowser:
     @wrapper.cookies_required
     @wrapper.log_empty_return
     @wrapper.randsleep
-    def _get_user_following(self, user_id, offset, limit, rest="show"):
+    def _get_user_following(self, user_id, offset, limit=50, rest="show"):
+        """Get following list of a user
+
+        Args:
+            offset: Start index of list
+            limit: Number of list, default to "50", must < 90
+            rest(restrict): "show" means "public", "hide" means private, you can just see private followings for your own account
+
+        Returns:
+            The list is body.users
+        """
         json_ = self.session.get(
             PyxivBrowser.url_user_following.format(user_id=user_id),
-            params={"offset": offset, "limit": limit, "rest": rest}
+            params={"offset": offset, "limit": limit if limit < 90 else 90, "rest": rest}
         ).json()
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.cookies_required
     @wrapper.log_empty_return
     @wrapper.randsleep
-    def _get_user_recommends(self, user_id, userNum, workNum, isR18=True):
+    def _get_user_recommends(self, user_id, userNum, workNum=3, isR18=True):
+        """Get recommends of a user
+
+        Args:
+            userNum: Number of recommends' user
+            workNum: Unknown
+            isR18: Unknown
+
+        Returns:
+            Recommends list is body.recommendUsers, the length of list <= userNum
+        """
         json_ = self.session.get(
-            PyxivBrowser.url_user_following.format(user_id=user_id),
+            PyxivBrowser.url_user_recommends.format(user_id=user_id),
             params={"userNum": userNum, "workNum": workNum, "isR18": isR18}
         ).json()
         return {} if json_.get("error") is True else json_.get("body")
@@ -193,6 +302,8 @@ class PyxivBrowser:
         json_ = self.session.get(PyxivBrowser.url_user_profile_top.format(user_id=user_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
+    # functions of saving
+
     @wrapper.log_calling_info
     def save_page(self, page_url, save_path):
         """save page"""
@@ -203,7 +314,7 @@ class PyxivBrowser:
 
     @wrapper.log_calling_info
     def save_illust(self, illust_id, save_path):
-        """save illust"""
+        """save all pages of an illust"""
 
         # check if R18 and set correct save path
         illust = self._get_illust(illust_id)
@@ -228,6 +339,7 @@ class PyxivBrowser:
 
     @wrapper.log_calling_info
     def save_user(self, user_id, save_path):
+        """save all illusts of a user"""
         user = self._get_user(user_id)
         user_all = self._get_user_profile_all(user_id)
         user_name = user.get("name")
@@ -246,6 +358,18 @@ class PyxivBrowser:
             self.save_user(user_id, save_path)
         return True
 
+    def save_followings(self, user_id, save_path):
+        """save all following users of a user"""
+        user_following = self._get_user_following(user_id, ..., ...)
+        following_ids = user_following.get(...)
+
+    def save_recommends(self, user_id, save_path):
+        """save all recommended users of a user"""
+        user_recommends = self._get_user_recommends(user_id, ..., ...)
+        recommend_ids = user_recommends.get(...)
+
+    # functions for config
+
     def download_illusts(self):
         """download all illusts"""
         self.save_illusts(self.config.illusts, self.config.save_path)
@@ -256,6 +380,12 @@ class PyxivBrowser:
 
         self.save_users(self.config.users, self.config.save_path)
         return True
+
+    def download_followings(self):
+        ...
+
+    def download_recommends(self):
+        ...
 
     def download_all(self):
         """download all files in config"""
