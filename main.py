@@ -8,8 +8,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = PyxivConfig().load(args.config)
-    pyxiv = PyxivBrowser(config)
+    browser = PyxivBrowser(config)
 
-    pyxiv.download_all()
-    # pyxiv.download_illusts()
-    # pyxiv.download_users()
+    browser.download_all()
+    # browser.download_illusts()
+    # browser.download_users()
