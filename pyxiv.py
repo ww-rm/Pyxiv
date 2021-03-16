@@ -2,7 +2,7 @@ import json
 import os
 import sys
 from pathlib import PurePath
-
+import sqlite3
 import requests
 
 import wrapper
@@ -128,44 +128,39 @@ class PyxivBrowser:
         "referer": url_host
     }
 
-    def __init__(self, config: PyxivConfig):
-        self.config = config
+    def __init__(self, proxies=None, cookies=None):
         self.session = requests.Session()
         self.session.headers = PyxivBrowser.headers
-        self.session.proxies = config.proxies
-        self.session.cookies.update(config.cookies)
+        if proxies:
+            self.session.proxies = proxies
+        if cookies:
+            self.session.cookies.update(cookies)
+        # print(self.session.proxies)
         # print(self.session.cookies)
 
     def __del__(self):
         self.session.close()
 
-    # functions of access api
-
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_page(self, page_url) -> bytes:
-        content = b""
-        try:
-            content = self.session.get(page_url).content
-        except Exception as e:
-            print(e.__class__, e, file=sys.stderr)
-        return content
+    @wrapper.browser_get
+    def get_page(self, page_url) -> bytes:
+        response = self.session.get(page_url)
+        if response.status_code != requests.codes["ok"]:
+            return b""
+        return response.content
 
     @wrapper.cookies_required
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_top_illust(self, mode="all"):
+    @wrapper.browser_get
+    def get_top_illust(self, mode="all"):
         """Get top illusts by mode
 
         Args:
             mode: "all" means all ages, "r18" means R-18 only
         """
         json_ = self.session.get(PyxivBrowser.url_top_illust, params={"mode": mode}).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_search_artworks(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="all"):
+    @wrapper.browser_get
+    def get_search_artworks(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="all"):
         """Get search artworks result
 
         Args:
@@ -184,11 +179,10 @@ class PyxivBrowser:
                 "s_mode": s_mode,
                 "type": type_
             }).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="illust"):
+    @wrapper.browser_get
+    def get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="illust"):
         """Get search illustration or ugoira result
 
         Args:
@@ -207,11 +201,10 @@ class PyxivBrowser:
                 "s_mode": s_mode,
                 "type": type_
             }).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="manga"):
+    @wrapper.browser_get
+    def get_search_manga(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="manga"):
         """Get search manga result
 
         Args:
@@ -230,30 +223,26 @@ class PyxivBrowser:
                 "s_mode": s_mode,
                 "type": type_
             }).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_illust(self, illust_id):
+    @wrapper.browser_get
+    def get_illust(self, illust_id):
         json_ = self.session.get(PyxivBrowser.url_illust.format(illust_id=illust_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_illust_pages(self, illust_id):
+    @wrapper.browser_get
+    def get_illust_pages(self, illust_id):
         json_ = self.session.get(PyxivBrowser.url_illust_pages.format(illust_id=illust_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_user(self, user_id):
+    @wrapper.browser_get
+    def get_user(self, user_id):
         json_ = self.session.get(PyxivBrowser.url_user.format(user_id=user_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
     @wrapper.cookies_required
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_user_following(self, user_id, offset, limit=50, rest="show"):
+    @wrapper.browser_get
+    def get_user_following(self, user_id, offset, limit=50, rest="show"):
         """Get following list of a user
 
         Args:
@@ -268,12 +257,11 @@ class PyxivBrowser:
             PyxivBrowser.url_user_following.format(user_id=user_id),
             params={"offset": offset, "limit": limit if limit < 90 else 90, "rest": rest}
         ).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
     @wrapper.cookies_required
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_user_recommends(self, user_id, userNum, workNum=3, isR18=True):
+    @wrapper.browser_get
+    def get_user_recommends(self, user_id, userNum, workNum=3, isR18=True):
         """Get recommends of a user
 
         Args:
@@ -288,26 +276,32 @@ class PyxivBrowser:
             PyxivBrowser.url_user_recommends.format(user_id=user_id),
             params={"userNum": userNum, "workNum": workNum, "isR18": isR18}
         ).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_user_profile_all(self, user_id):
+    @wrapper.browser_get
+    def get_user_profile_all(self, user_id):
         json_ = self.session.get(PyxivBrowser.url_user_profile_all.format(user_id=user_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
-    @wrapper.log_empty_return
-    @wrapper.randsleep
-    def _get_user_profile_top(self, user_id):
+    @wrapper.browser_get
+    def get_user_profile_top(self, user_id):
         json_ = self.session.get(PyxivBrowser.url_user_profile_top.format(user_id=user_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return json_.get("body")
 
+class PyxivDatabase:
+    ...
+
+class PyxivDownloader:
+    def __init__(self, config: PyxivConfig):
+        self.db = ...
+        self.config = config
+        self.browser = PyxivBrowser(config.proxies, config.cookies)
     # functions of saving
 
     @wrapper.log_calling_info
     def save_page(self, page_url, save_path):
         """save page"""
-        content = self._get_page(page_url)
+        content = self.browser.get_page(page_url)
         if content:
             with open(save_path, "wb") as f:
                 f.write(content)
@@ -317,13 +311,13 @@ class PyxivBrowser:
         """save all pages of an illust"""
 
         # check if R18 and set correct save path
-        illust = self._get_illust(illust_id)
+        illust = self.browser.get_illust(illust_id)
         if self.config.R18 and "R-18" in [tag.get("tag") for tag in illust.get("tags").get("tags")]:
             save_path = PurePath(save_path, "R-18")
         os.makedirs(save_path, exist_ok=True)
 
         # get all pages and check pages need to download
-        illust_pages = self._get_illust_pages(illust_id)
+        illust_pages = self.browser.get_illust_pages(illust_id)
         all_pages = {
             page.get("urls").get("original").split("/")[-1]: page.get("urls").get("original")
             for page in illust_pages
@@ -340,8 +334,8 @@ class PyxivBrowser:
     @wrapper.log_calling_info
     def save_user(self, user_id, save_path):
         """save all illusts of a user"""
-        user = self._get_user(user_id)
-        user_all = self._get_user_profile_all(user_id)
+        user = self.browser.get_user(user_id)
+        user_all = self.browser.get_user_profile_all(user_id)
         user_name = user.get("name")
         save_path = PurePath(save_path, "{}_{}".format(user_id, user_name))
         os.makedirs(save_path, exist_ok=True)
@@ -360,12 +354,12 @@ class PyxivBrowser:
 
     def save_followings(self, user_id, save_path):
         """save all following users of a user"""
-        user_following = self._get_user_following(user_id, ..., ...)
+        user_following = self.browser.get_user_following(user_id, ..., ...)
         following_ids = user_following.get(...)
 
     def save_recommends(self, user_id, save_path):
         """save all recommended users of a user"""
-        user_recommends = self._get_user_recommends(user_id, ..., ...)
+        user_recommends = self.browser.get_user_recommends(user_id, ..., ...)
         recommend_ids = user_recommends.get(...)
 
     # functions for config

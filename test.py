@@ -8,8 +8,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = PyxivConfig().load(args.config)
-    downloader = PyxivDownloader(config)
+    browser = PyxivBrowser(config.proxies, config.cookies)
 
-    downloader.download_all()
+
+    browser.get_page("https://i.pximg.net/img-original/img/2021/03/16/03/20/03/88483729_p0.png")
     # downloader.download_illusts()
     # downloader.download_users()
