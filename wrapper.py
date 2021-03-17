@@ -2,6 +2,7 @@ import random
 from functools import wraps
 from time import sleep
 import sys
+import sqlite3
 
 
 def browser_get(method, log_file=sys.stderr, max_sleep_seconds=5):
@@ -25,25 +26,13 @@ def cookies_required(method):
     @wraps(method)
     def decorated_method(self, *args, **kwargs):
         if not (
-            "PHPSESSID" in self.session.cookies and
-            "device_token" in self.session.cookies and
-            "privacy_policy_agreement" in self.session.cookies
+            self.session.cookies.get("PHPSESSID") and
+            self.session.cookies.get("device_token") and
+            self.session.cookies.get("privacy_policy_agreement")
         ):
             raise PermissionError("Cookies not found!")
         else:
             return method(self, *args, **kwargs)
-    return decorated_method
-
-
-def log_setter_error(method, log_file=sys.stderr):
-    """Check if failed to set property."""
-    @wraps(method)
-    def decorated_method(self, *args, **kwargs):
-        try:
-            method(self, *args, **kwargs)
-        except Exception as e:
-            error_msg = "Failed to Set:Property:{}".format(method.__name__)
-            print(error_msg, file=log_file)
     return decorated_method
 
 
@@ -54,4 +43,16 @@ def log_calling_info(method, log_file=sys.stdout):
         info_msg = "Calling Func:Method:{}:Args:{}:KwArgs:{}".format(method.__name__, args, kwargs)
         print(info_msg, file=log_file)
         return method(self, *args, **kwargs)
+    return decorated_method
+
+
+def database_operation(method, log_file=sys.stderr):
+    @wraps(method)
+    def decorated_method(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except sqlite3.Error as e:
+            print(e.__class__, e, file=log_file)
+            print("Failed to Execute:{}:{}:{}".format(method.__name__, args, kwargs))
+            return []
     return decorated_method
