@@ -139,7 +139,7 @@ class PyxivSpider:
         """
 
         # get exist user ids
-        exist_user_ids = set(row[0] for row in self.db("SELECT id FROM user;"))
+        exist_user_ids = list(row[0] for row in self.db("SELECT id FROM user;"))
 
         # prepare seeds
         if seed_user_ids is None:
@@ -156,6 +156,7 @@ class PyxivSpider:
         # exist: exist_user_ids: [id, ...]
         seed_user_ids = set((i, None) for i in seed_user_ids)
         saved_user_ids = set()
+        exist_user_ids = set(exist_user_ids)
         # for each seed user id, get its expand user ids
         while len(seed_user_ids) > 0 and len(saved_user_ids) < max_user_num:
             user_id, user_name = seed_user_ids.pop()
@@ -211,7 +212,7 @@ class PyxivSpider:
         """return (user.id, user.name, illust.id, page.page_id, page.url_original)"""
         illust_ids = []
         for name in names:
-            illust_ids.append([row[0] for row in self.db("SELECT illust_id FROM tag WHERE name = ?", (name,))])
+            illust_ids.append([row[0] for row in self.db("SELECT illust_id FROM tag WHERE name = ?;", (name,))])
 
         # intersect
         result = set(illust_ids[0])
@@ -227,20 +228,11 @@ class PyxivSpider:
                     """SELECT user.id, user.name, illust_id, page_id, url_original 
                         FROM page JOIN user JOIN illust 
                         ON page.illust_id=illust.id AND user.id=illust.user_id
-                        WHERE illust_id = ?""", illust_id
+                        WHERE illust_id = ?;""", (illust_id, )
                 )
             )
 
         return list(result)
-
-    def _select_page_url_original_by_user_name(self, user_name):
-        """return (user.id, user.name, illust.id, page_id, page.url_original)"""
-        return self.db(
-            """SELECT user.id, user.name, illust.id, page_id, url_original 
-                FROM user JOIN illust JOIN page
-                ON page.illust_id=illust.id AND user.id=illust.user_id
-                WHERE user.name = ?""", (user_name,)
-        )
 
     def _select_page_url_original_by_user_id(self, user_id):
         """return (user.id, user.name, illust.id, page_id, page.url_original)"""
@@ -248,7 +240,7 @@ class PyxivSpider:
             """SELECT user.id, user.name, illust.id, page_id, url_original 
                 FROM user JOIN illust JOIN page
                 ON page.illust_id=illust.id AND user.id=illust.user_id
-                WHERE user.id = ?""", (user_id,)
+                WHERE user.id = ?;""", (user_id,)
         )
 
     def _select_page_url_original_by_illust_id(self, illust_id):
@@ -257,7 +249,7 @@ class PyxivSpider:
             """SELECT user.id, user.name, illust.id, page_id, url_original 
                 FROM user JOIN illust JOIN page
                 ON page.illust_id=illust.id AND user.id=illust.user_id
-                WHERE illust.id = ?""", (illust_id,)
+                WHERE illust.id = ?;""", (illust_id,)
         )
 
     @wrapper.log_calling_info
@@ -285,11 +277,6 @@ class PyxivSpider:
         pages_need_to_save = self._select_page_url_original_by_tag(names)
         self._download_retrieve(pages_need_to_save)
 
-    def retrieve_by_user_name(self, name: str):
-        """name: user name"""
-        pages_need_to_save = self._select_page_url_original_by_user_name(name)
-        self._download_retrieve(pages_need_to_save)
-
     def retrieve_by_user_id(self, user_id: int):
         """user_id: id"""
         pages_need_to_save = self._select_page_url_original_by_user_id(user_id)
@@ -314,7 +301,7 @@ class PyxivSpider:
         if save_illust:
             self._save_illust(illust_id, insert_user)
         tags = [row[0] for row in self.db("SELECT name FROM tag WHERE illust_id = ?", illust_id)]
-        page_urls = [row[0] for row in self.db("SELECT url_original FROM page WHERE illust_id = ?", illust_id)]
+        page_urls = [row[0] for row in self.db("SELECT url_original FROM page WHERE illust_id = ?;", (illust_id, ))]
         if "R-18" in tags:
             save_dir = PurePath(save_dir, "R-18")
         for page_url in page_urls:
@@ -327,8 +314,8 @@ class PyxivSpider:
         """save all iilust of a user"""
 
         self.save_user(user_id)
-        user_name = self.db("SELECT name FROM user WHERE id = ?", user_id)[0][0]
-        illust_ids = [row[0] for row in self.db("SELECT id FROM illust WHERE user_id = ?", user_id)]
+        user_name = self.db("SELECT name FROM user WHERE id = ?;", (user_id,))[0][0]
+        illust_ids = [row[0] for row in self.db("SELECT id FROM illust WHERE user_id = ?;", (user_id,))]
         save_dir = PurePath(save_dir, user_id, user_name)
         for illust_id in illust_ids:
             self._download_illust(illust_id, save_dir, False, False)
@@ -340,7 +327,7 @@ class PyxivSpider:
         """return (page.save_path)"""
         illust_ids = []
         for name in names:
-            illust_ids.append([row[0] for row in self.db("SELECT illust_id FROM tag WHERE name = ?", (name,))])
+            illust_ids.append([row[0] for row in self.db("SELECT illust_id FROM tag WHERE name = ?;", (name,))])
 
         # intersect
         result = set(illust_ids[0])
@@ -353,34 +340,12 @@ class PyxivSpider:
         for illust_id in illust_ids:
             result.extend(
                 [row[0] for row in self.db(
-                    "SELECT save_path FROM page WHERE illust_id = ? AND save_path != ''",
-                    illust_id
+                    "SELECT save_path FROM page WHERE illust_id = ? AND save_path != '';",
+                    (illust_id,)
                 )]
             )
 
         return list(result)
-
-    def _select_page_save_path_by_user_name(self, user_name):
-        """return save_path"""
-        return [row[0] for row in self.db(
-            """SELECT save_path
-                FROM user JOIN illust JOIN page
-                ON page.illust_id=illust.id AND user.id=illust.user_id
-                WHERE user.name = ? AND save_path != ''""", (user_name,)
-        )]
-
-    def _select_page_save_path_by_user_id(self, user_id):
-        """return save_path"""
-        return [row[0] for row in self.db(
-            """SELECT save_path
-                FROM user JOIN illust JOIN page
-                ON page.illust_id=illust.id AND user.id=illust.user_id
-                WHERE user.id = ? AND save_path != ''""", (user_id,)
-        )]
-
-    def _select_page_save_path_by_illust_id(self, illust_id):
-        """return save_path"""
-        return [row[0] for row in self.db("SELECT save_path FROM page WHERE illust_id = ? AND save_path != ''", (illust_id,))]
 
     def _copyto(self, src_files, dest_dir):
         for path in src_files:
@@ -391,14 +356,17 @@ class PyxivSpider:
         save_paths = self._select_page_save_path_by_tag(names)
         self._copyto(save_paths, dest_dir)
 
-    def copyto_by_user_name(self, dest_dir, name):
-        save_paths = self._select_page_save_path_by_user_name(name)
+    def copyto_by_illust_id(self, dest_dir, illust_id):
+        save_paths = [row[0] for row in self.db("SELECT save_path FROM page WHERE illust_id = ? AND save_path != '';", (illust_id,))]
         self._copyto(save_paths, dest_dir)
 
     def copyto_by_user_id(self, dest_dir, user_id):
-        save_paths = self._select_page_save_path_by_user_id(user_id)
-        self._copyto(save_paths, dest_dir)
-
-    def copyto_by_illust_id(self, dest_dir, illust_id):
-        save_paths = self._select_page_save_path_by_illust_id(illust_id)
-        self._copyto(save_paths, dest_dir)
+        user_name = self.db("SELECT name FROM user WHERE id = ?;", (user_id, ))[0][0]
+        dest_dir = PurePath(dest_dir, "{}_{}".format(user_id, user_name))
+        illust_ids = [row[0] for row in self.db("SELECT id FROM illust WHERE user_id = ?;", (user_id,))]
+        for illust_id in illust_ids:
+            tags = [row[0] for row in self.db("SELECT name FROM tag WHERE illust_id = ?;", (illust_id,))]
+            if "R-18" in tags:
+                self.copyto_by_illust_id(PurePath(dest_dir, "R-18"), illust_id)
+            else:
+                self.copyto_by_illust_id(dest_dir, illust_id)

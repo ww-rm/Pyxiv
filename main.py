@@ -9,5 +9,5 @@ if __name__ == "__main__":
     config = PyxivConfig(args.config)
 
     spider = PyxivSpider(config)
-    spider.update_all()
+    spider.crawl_by_recommends()
     
