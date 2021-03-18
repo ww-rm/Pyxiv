@@ -15,7 +15,7 @@
             "type": "python",
             "request": "launch",
             "program": "main.py",
-            "console": "internalConsole"
+            "console": "externalTerminal"
         },
         {
             "name": "Python: test",

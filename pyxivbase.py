@@ -252,11 +252,17 @@ class PyxivDatabase:
     def __del__(self):
         self.connection.close()
 
-    def __call__(self, sql: str, parameters: str = None):
+    @wrapper.database_operation
+    def __call__(self, sql: str, parameters=None) -> list:
+        """A shortcut method for "execute" method to execute sql commands
+
+        Returns:
+            Always returns the fetchall() of a cursor object
+        """
         if parameters:
-            return self.connection.execute(sql, parameters)
+            return self.connection.execute(sql, parameters).fetchall()
         else:
-            return self.connection.execute(sql)
+            return self.connection.execute(sql).fetchall()
 
     def _init(self):
         cursor = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table';")
@@ -319,113 +325,3 @@ class PyxivDatabase:
             (save_path, illust_id, page_id)
         )
 
-    # get save_path
-
-    @wrapper.database_operation
-    def select_page_save_path_by_tag(self, names):
-        results = []
-        for name in names:
-            cursor = self.connection.execute(
-                """SELECT save_path FROM page
-                    WHERE illust_id = (
-                        SELECT DISTINCT illust_id FROM tag
-                        WHERE tag = ?
-                    )""", (name,)
-            )
-            results.append(cursor.fetchall())
-
-        result = set(results[0])
-        for r in results[1:]:
-            result.intersection_update(r)
-        return list(result)
-
-    @wrapper.database_operation
-    def select_page_save_path_by_user_name(self, name):
-        cursor = self.connection.execute(
-            """SELECT save_path FROM page
-                WHERE illust_id = (
-                    SELECT id FROM illust
-                    WHERE user_id = (SELECT id FROM user WHERE name = ?)
-                )""", (name,)
-        )
-        return cursor.fetchall()
-
-    @wrapper.database_operation
-    def select_page_save_path_by_user_id(self, id_):
-        cursor = self.connection.execute(
-            """SELECT save_path FROM page
-                WHERE illust_id = (SELECT id FROM illust WHERE user_id = ?)""", (id_,)
-        )
-        return cursor.fetchall()
-
-    @wrapper.database_operation
-    def select_page_save_path_by_illust_id(self, id_):
-        cursor = self.connection.execute("SELECT save_path FROM page WHERE illust_id = ?", (id_,))
-        return cursor.fetchall()
-
-    # get url_original
-    # return (user.id, user.name, illust.id, page.url_original)
-
-    @wrapper.database_operation
-    def select_page_url_original_by_tag(self, names):
-        """return (user.id, user.name, illust.id, page.url_original)"""
-        results = []
-        for name in names:
-            cursor = self.connection.execute(
-                """SELECT user.id, user.name, illust.id, url_original FROM user JOIN illust JOIN page JOIN tag
-                    WHERE illust.id = (
-                        SELECT DISTINCT illust_id FROM tag
-                        WHERE tag = ?
-                    ) AND save_path != ''""", (name,)
-            )
-            results.append(cursor.fetchall())
-
-        result = set(results[0])
-        for r in results[1:]:
-            result.intersection_update(r)
-        return list(result)
-
-    @wrapper.database_operation
-    def select_page_url_original_by_user_name(self, name):
-        """return (user.id, user.name, illust.id, page.url_original)"""
-        cursor = self.connection.execute(
-            """SELECT user.id, user.name, illust.id, url_original FROM user JOIN illust JOIN page JOIN tag
-                WHERE illust.id = (
-                    SELECT id FROM illust
-                    WHERE user_id = (SELECT id FROM user WHERE name = ?)
-                ) AND save_path != ''""", (name,)
-        )
-        return cursor.fetchall()
-
-    @wrapper.database_operation
-    def select_page_url_original_by_user_id(self, id_):
-        """return (user.id, user.name, illust.id, page.url_original)"""
-        cursor = self.connection.execute(
-            """SELECT user.id, user.name, illust.id, url_original FROM user JOIN illust JOIN page JOIN tag
-                WHERE illust.id = (SELECT id FROM illust WHERE user_id = ?) AND save_path != ''""", (id_,)
-        )
-        return cursor.fetchall()
-
-    @wrapper.database_operation
-    def select_page_url_original_by_illust_id(self, id_):
-        """return (user.id, user.name, illust.id, page.url_original)"""
-        cursor = self.connection.execute(
-            """SELECT user.id, user.name, illust.id, url_original FROM user JOIN illust JOIN page JOIN tag 
-                WHERE illust.id = ? AND save_path != ''""",
-            (id_,)
-        )
-        return cursor.fetchall()
-
-    # list values
-
-    def list_tag_name(self):
-        cursor = self.connection.execute("SELECT DISTINCT name FROM tag")
-        return cursor.fetchall()
-
-    def list_user_id_name(self):
-        cursor = self.connection.execute("SELECT id, name FROM user")
-        return cursor.fetchall()
-
-    def list_illust_title(self):
-        cursor = self.connection.execute("SELECT title FROM illust")
-        return cursor.fetchall()
