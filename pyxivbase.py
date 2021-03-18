@@ -1,6 +1,17 @@
 import sqlite3
 import requests
 import wrapper
+import json
+
+
+class PyxivConfig:
+    def __init__(self, config_path):
+        self.__config = {}
+        with open(config_path, "r", encoding="utf8") as f:
+            self.__config = json.load(f)
+
+    def __getattr__(self, name):
+        return self.__config.get(name)
 
 
 class PyxivBrowser:
@@ -31,13 +42,15 @@ class PyxivBrowser:
         "referer": url_host
     }
 
-    def __init__(self, proxies=None, cookies=None):
+    def __init__(self, proxies: dict = None, cookies: dict = None):
         self.session = requests.Session()
         self.session.headers = PyxivBrowser.headers
         if proxies:
             self.session.proxies = proxies
         if cookies:
-            self.session.cookies.update(cookies)
+            for name, value in cookies.items():
+                self.session.cookies.set(name, value, domain=".pixiv.net", path="/")
+        # print(self.session.cookies.list_domains())
         # print(self.session.proxies)
         # print(self.session.cookies)
 
@@ -134,9 +147,9 @@ class PyxivBrowser:
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_illust_pages(self, illust_id):
+    def get_illust_pages(self, illust_id) -> list:
         json_ = self.session.get(PyxivBrowser.url_illust_pages.format(illust_id=illust_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return [] if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
     def get_user(self, user_id):
@@ -293,7 +306,7 @@ class PyxivDatabase:
 
     @wrapper.database_operation
     def insert_page(self, illust_id, page_id, url_original, save_path=""):
-        self.connection.executemany("INSERT INTO page VALUES (?, ?, ?, ?);", (illust_id, page_id, url_original, save_path))
+        self.connection.execute("INSERT INTO page VALUES (?, ?, ?, ?);", (illust_id, page_id, url_original, save_path))
 
     @wrapper.database_operation
     def insert_tag(self, name, illust_id):
@@ -301,7 +314,7 @@ class PyxivDatabase:
 
     @wrapper.database_operation
     def update_page_save_path(self, illust_id, page_id, save_path=""):
-        self.connection.executemany(
+        self.connection.execute(
             "UPDATE page SET save_path = ? WHERE illust_id = ? AND page_id = ?;",
             (save_path, illust_id, page_id)
         )
@@ -410,7 +423,7 @@ class PyxivDatabase:
         return cursor.fetchall()
 
     def list_user_id_name(self):
-        cursor = self.connection.execute("SELECT id, name, FROM user")
+        cursor = self.connection.execute("SELECT id, name FROM user")
         return cursor.fetchall()
 
     def list_illust_title(self):
