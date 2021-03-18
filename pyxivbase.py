@@ -164,11 +164,11 @@ class PyxivBrowser:
 
     @wrapper.cookies_required
     @wrapper.browser_get
-    def get_user_recommends(self, user_id, userNum, workNum=3, isR18=True):
+    def get_user_recommends(self, user_id, userNum=100, workNum=3, isR18=True):
         """Get recommends of a user
 
         Args:
-            userNum: Number of recommends' user
+            userNum: Number of recommends' user, limit to less than 100
             workNum: Unknown
             isR18: Unknown
 
@@ -238,6 +238,12 @@ class PyxivDatabase:
 
     def __del__(self):
         self.connection.close()
+
+    def __call__(self, sql: str, parameters: str = None):
+        if parameters:
+            return self.connection.execute(sql, parameters)
+        else:
+            return self.connection.execute(sql)
 
     def _init(self):
         cursor = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table';")
