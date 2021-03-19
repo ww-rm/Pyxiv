@@ -136,6 +136,10 @@ class PyxivSpider:
         for illust_id in illust_ids:
             self.save_illust(illust_id)
 
+    # Crawl methods begin here
+    # Used to automatic crawl metadata
+    # by user followings or pixiv recommends 
+
     def _get_user_id_by_followings(self, user_id) -> list:
         """Return: [int(id), ...]"""
         # be sure all followings are retrieved
