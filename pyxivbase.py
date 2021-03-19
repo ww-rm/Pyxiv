@@ -209,41 +209,39 @@ class PyxivDatabase:
     """PyxivDatabase
 
     Tables:
-        "user" (
-            "id" INTEGER NOT NULL DEFAULT 0,
-            "name" TEXT NOT NULL DEFAULT '',
-            PRIMARY KEY ("id")
-        )
-        "illust" (
-            "id" INTEGER NOT NULL DEFAULT 0,
-            "user_id" INTEGER NOT NULL DEFAULT 0,
-            "title" TEXT NOT NULL DEFAULT '',
-            PRIMARY KEY ("id"),
+        CREATE TABLE "user" (
+            "id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "name" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+            PRIMARY KEY ("id") ON CONFLICT REPLACE
+        );
+        CREATE TABLE "illust" (
+            "id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "title" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+            "description" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+            "bookmark_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "like_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "view_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "user_id" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            PRIMARY KEY ("id") ON CONFLICT REPLACE,
             FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-        )
-        "page" (
-            "illust_id" INTEGER NOT NULL DEFAULT 0,
-            "page_id" INTEGER NOT NULL DEFAULT 0,
-            "url_original" TEXT NOT NULL DEFAULT '',
-            "save_path" TEXT NOT NULL DEFAULT '',
-            PRIMARY KEY ("illust_id", "page_id"),
+        );
+        CREATE TABLE "page" (
+            "illust_id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "page_id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "url_original" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+            PRIMARY KEY ("illust_id", "page_id") ON CONFLICT REPLACE,
             FOREIGN KEY ("illust_id") REFERENCES "illust" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-        )
-        "tag" (
-            "name" TEXT NOT NULL DEFAULT '',
-            "illust_id" INTEGER NOT NULL DEFAULT 0,
-            PRIMARY KEY ("name", "illust_id"),
+        );
+        CREATE TABLE "tag" (
+            "name" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+            "illust_id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            PRIMARY KEY ("name", "illust_id") ON CONFLICT REPLACE,
             FOREIGN KEY ("illust_id") REFERENCES "illust" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-        )
-    """
+        );
 
-    tables = ["user", "illust", "page", "tag"]
-    fields = {
-        "user": ["id", "name"],
-        "illust": ["id", "user_id", "title"],
-        "page": ["illust_id", "page_id", "url_original", "save_path"],
-        "tag": ["name", "illust_id"]
-    }
+    Methods:
+        insert_*: insert or update row
+    """
 
     def __init__(self, db_path):
         self.connection = sqlite3.connect(db_path, isolation_level=None)
@@ -269,59 +267,66 @@ class PyxivDatabase:
         if not cursor.fetchall():
             self.connection.execute(
                 """CREATE TABLE "user" (
-                    "id" INTEGER NOT NULL DEFAULT 0,
-                    "name" TEXT NOT NULL DEFAULT '',
-                    PRIMARY KEY ("id")
+                    "id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "name" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+                    PRIMARY KEY ("id") ON CONFLICT REPLACE
                 );"""
             )
             self.connection.execute(
                 """CREATE TABLE "illust" (
-                    "id" INTEGER NOT NULL DEFAULT 0,
-                    "user_id" INTEGER NOT NULL DEFAULT 0,
-                    "title" TEXT NOT NULL DEFAULT '',
-                    PRIMARY KEY ("id"),
+                    "id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "title" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+                    "description" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+                    "bookmark_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "like_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "view_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "user_id" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    PRIMARY KEY ("id") ON CONFLICT REPLACE,
                     FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE CASCADE
                 );"""
             )
             self.connection.execute(
                 """CREATE TABLE "page" (
-                    "illust_id" INTEGER NOT NULL DEFAULT 0,
-                    "page_id" INTEGER NOT NULL DEFAULT 0,
-                    "url_original" TEXT NOT NULL DEFAULT '',
-                    "save_path" TEXT NOT NULL DEFAULT '',
-                    PRIMARY KEY ("illust_id", "page_id"),
+                    "illust_id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "page_id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "url_original" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+                    PRIMARY KEY ("illust_id", "page_id") ON CONFLICT REPLACE,
                     FOREIGN KEY ("illust_id") REFERENCES "illust" ("id") ON DELETE CASCADE ON UPDATE CASCADE
                 );"""
             )
             self.connection.execute(
                 """CREATE TABLE "tag" (
-                    "name" TEXT NOT NULL DEFAULT '',
-                    "illust_id" INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY ("name", "illust_id"),
+                    "name" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '' COLLATE NOCASE,
+                    "illust_id" INTEGER NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    PRIMARY KEY ("name", "illust_id") ON CONFLICT REPLACE,
                     FOREIGN KEY ("illust_id") REFERENCES "illust" ("id") ON DELETE CASCADE ON UPDATE CASCADE
                 );"""
             )
 
     @wrapper.database_operation
     def insert_user(self, id_, name):
-        self.connection.execute("INSERT INTO user VALUES (?, ?);", (id_, name))
+        self.connection.execute(
+            "INSERT INTO user VALUES (?, ?);",
+            (id_, name)
+        )
 
     @wrapper.database_operation
-    def insert_illust(self, id_, user_id, title):
-        self.connection.execute("INSERT INTO illust VALUES (?, ?, ?);", (id_, user_id, title))
+    def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id):
+        self.connection.execute(
+            "INSERT INTO illust VALUES (?, ?, ?, ?, ?, ?, ?);",
+            (id_, title, description, bookmark_count, like_count, view_count, user_id)
+        )
 
     @wrapper.database_operation
-    def insert_page(self, illust_id, page_id, url_original, save_path=""):
-        self.connection.execute("INSERT INTO page VALUES (?, ?, ?, ?);", (illust_id, page_id, url_original, save_path))
+    def insert_page(self, illust_id, page_id, url_original):
+        self.connection.execute(
+            "INSERT INTO page VALUES (?, ?, ?);",
+            (illust_id, page_id, url_original)
+        )
 
     @wrapper.database_operation
     def insert_tag(self, name, illust_id):
-        self.connection.execute("INSERT INTO tag VALUES (?, ?);", (name, illust_id))
-
-    @wrapper.database_operation
-    def update_page_save_path(self, illust_id, page_id, save_path=""):
         self.connection.execute(
-            "UPDATE page SET save_path = ? WHERE illust_id = ? AND page_id = ?;",
-            (save_path, illust_id, page_id)
+            "INSERT INTO tag VALUES (?, ?);",
+            (name, illust_id)
         )
-
