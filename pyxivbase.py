@@ -66,7 +66,7 @@ class PyxivBrowser:
 
     @wrapper.cookies_required
     @wrapper.browser_get
-    def get_top_illust(self, mode="all"):
+    def get_top_illust(self, mode="all") -> dict:
         """Get top illusts by mode
 
         Args:
@@ -76,7 +76,7 @@ class PyxivBrowser:
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_search_artworks(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="all"):
+    def get_search_artworks(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="all") -> dict:
         """Get search artworks result
 
         Args:
@@ -98,7 +98,7 @@ class PyxivBrowser:
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="illust"):
+    def get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="illust") -> dict:
         """Get search illustration or ugoira result
 
         Args:
@@ -120,7 +120,7 @@ class PyxivBrowser:
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_search_manga(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="manga"):
+    def get_search_manga(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="manga") -> dict:
         """Get search manga result
 
         Args:
@@ -142,7 +142,7 @@ class PyxivBrowser:
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_illust(self, illust_id):
+    def get_illust(self, illust_id) -> dict:
         json_ = self.session.get(PyxivBrowser.url_illust.format(illust_id=illust_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
@@ -152,13 +152,13 @@ class PyxivBrowser:
         return [] if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_user(self, user_id):
+    def get_user(self, user_id) -> dict:
         json_ = self.session.get(PyxivBrowser.url_user.format(user_id=user_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.cookies_required
     @wrapper.browser_get
-    def get_user_following(self, user_id, offset, limit=50, rest="show"):
+    def get_user_following(self, user_id, offset, limit=50, rest="show") -> dict:
         """Get following list of a user
 
         Args:
@@ -177,7 +177,7 @@ class PyxivBrowser:
 
     @wrapper.cookies_required
     @wrapper.browser_get
-    def get_user_recommends(self, user_id, userNum=100, workNum=3, isR18=True):
+    def get_user_recommends(self, user_id, userNum=100, workNum=3, isR18=True) -> dict:
         """Get recommends of a user
 
         Args:
@@ -195,12 +195,12 @@ class PyxivBrowser:
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_user_profile_all(self, user_id):
+    def get_user_profile_all(self, user_id) -> dict:
         json_ = self.session.get(PyxivBrowser.url_user_profile_all.format(user_id=user_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_user_profile_top(self, user_id):
+    def get_user_profile_top(self, user_id) -> dict:
         json_ = self.session.get(PyxivBrowser.url_user_profile_top.format(user_id=user_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
