@@ -5,7 +5,7 @@ import sys
 import sqlite3
 
 
-def browser_get(method, log_file=sys.stderr, max_sleep_seconds=5):
+def browser_get(method, log_file=sys.stderr, max_sleep_seconds=3):
     @wraps(method)
     def decorated_method(self, *args, **kwargs):
         sleep(0.1+random.random()*(max_sleep_seconds-0.1))
@@ -18,6 +18,16 @@ def browser_get(method, log_file=sys.stderr, max_sleep_seconds=5):
             ret = None
             print("Empty Return:{}:{}:{}".format(method.__name__, args, kwargs), file=log_file)
         return ret
+    return decorated_method
+
+def browser_post(method, log_file=sys.stderr, max_sleep_seconds=3):
+    @wraps(method)
+    def decorated_method(self, *args, **kwargs):
+        sleep(0.1+random.random()*(max_sleep_seconds-0.1))
+        try:
+            method(self, *args, **kwargs)
+        except Exception as e:
+            print(e.__class__, e, file=log_file)
     return decorated_method
 
 

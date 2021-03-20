@@ -23,7 +23,7 @@ class PyxivSpider:
         self.browser = PyxivBrowser(self.config.proxies, self.config.cookies)
         self.db = PyxivDatabase(self.config.db_path)
 
-    # Crawling methods begin here
+    # Save methods begin here
     # Used to save metadata to database, without downloading real pictures
 
     @wrapper.log_calling_info
