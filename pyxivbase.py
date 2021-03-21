@@ -368,7 +368,7 @@ class PyxivBrowser:
         return {} if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_ranking(self, p=1, content="all", mode="daily") -> dict:
+    def get_ranking(self, p=1, content="all", mode="daily", date: str = None) -> dict:
         """Get ranking, limit 50 illusts info in one page
 
         Args:
@@ -380,14 +380,15 @@ class PyxivBrowser:
                 "manga": mode["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie"]
             mode: ["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie", 
                 "original", "male", "male_r18", "female", "female_r18"]
+            date: ranking date, example: 20210319, None means the newest
 
         Note: May need cookies to get r18 ranking
         """
         json_ = self.session.get(
             PyxivBrowser.php_ranking,
-            params={"format": "json", "p": p, "content": content, "mode": mode}
+            params={"format": "json", "p": p, "content": content, "mode": mode, "date": date}
         ).json()
-        return {} if json_.get("error") else json_.get("contents")
+        return {} if json_.get("error") else json_
 
     @wrapper.cookies_required
     @wrapper.browser_get

@@ -187,9 +187,9 @@ class PyxivSpider:
                 for name in tags:
                     self.db.insert_tag(name, illust_id)
 
-        # Crawl methods begin here
-        # Used to automatic crawl metadata
-        # by user followings or pixiv recommends
+    # Crawl methods begin here
+    # Used to automatic crawl metadata
+    # by user followings or pixiv recommends
 
     def _get_user_id_by_followings(self, user_id) -> list:
         """Return: [int(id), ...]"""
@@ -347,53 +347,6 @@ class PyxivSpider:
                 else:
                     seed_illust_ids.add(illust_id)  # not remove it
 
-    # Retrieve methods begin here
-    # Used to retrieve pictures to config save_path by specific scope
-
-    def _select_page_url_original_by_tag(self, names):
-        """return (user.id, user.name, illust.id, page.page_id, page.url_original)"""
-        illust_ids = []
-        for name in names:
-            illust_ids.append([row[0] for row in self.db("SELECT illust_id FROM tag WHERE name = ?;", (name,))])
-
-        # intersect
-        result = set(illust_ids[0])
-        for r in illust_ids[1:]:
-            result.intersection_update(r)
-        illust_ids = list(result)
-
-        # get page_urls
-        result = []
-        for illust_id in illust_ids:
-            result.extend(
-                self.db(
-                    """SELECT user.id, user.name, illust_id, page_id, url_original
-                        FROM page JOIN user JOIN illust
-                        ON page.illust_id=illust.id AND user.id=illust.user_id
-                        WHERE illust_id = ?;""", (illust_id, )
-                )
-            )
-
-        return list(result)
-
-    def _select_page_url_original_by_user_id(self, user_id):
-        """return (user.id, user.name, illust.id, page_id, page.url_original)"""
-        return self.db(
-            """SELECT user.id, user.name, illust.id, page_id, url_original
-                FROM user JOIN illust JOIN page
-                ON page.illust_id=illust.id AND user.id=illust.user_id
-                WHERE user.id = ?;""", (user_id,)
-        )
-
-    def _select_page_url_original_by_illust_id(self, illust_id):
-        """return (user.id, user.name, illust.id, page_id, page.url_original)"""
-        return self.db(
-            """SELECT user.id, user.name, illust.id, page_id, url_original
-                FROM user JOIN illust JOIN page
-                ON page.illust_id=illust.id AND user.id=illust.user_id
-                WHERE illust.id = ?;""", (illust_id,)
-        )
-
     # Download methods begin here
     # Used to download pictures to local path
     # It will first search database for illust information
@@ -452,7 +405,7 @@ class PyxivSpider:
         else:
             return False
 
-    def download_ranking(self, save_dir, p=1, content="all", mode="daily"):
+    def download_ranking(self, save_dir, p=1, content="all", mode="daily", date=None):
         """Get ranking, limit 50 illusts info in one page
 
         Args:
@@ -464,11 +417,63 @@ class PyxivSpider:
                 "manga": mode["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie"]
             mode: ["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie", 
                 "original", "male", "male_r18", "female", "female_r18"]
+            date: ranking date, example: 20210319, None means the newest
 
         Note: May need cookies to get r18 ranking
         """
-        ranking = self.browser.get_ranking(p, content, mode)
+        ranking = self.browser.get_ranking(p, content, mode, date)
         if ranking:
+            save_dir = PurePath(save_dir, "ranking_{}".format(ranking.get("date")))
             illust_ids = [e.get("illust_id") for e in ranking.get("contents")]
             for illust_id in illust_ids:
                 self.download_illust(illust_id, save_dir)
+
+
+class PyxivIndexer:
+    ...
+    # Retrieve methods begin here
+    # Used to retrieve pictures to config save_path by specific scope
+
+    # def _select_page_url_original_by_tag(self, names):
+    #     """return (user.id, user.name, illust.id, page.page_id, page.url_original)"""
+    #     illust_ids = []
+    #     for name in names:
+    #         illust_ids.append([row[0] for row in self.db("SELECT illust_id FROM tag WHERE name = ?;", (name,))])
+
+    #     # intersect
+    #     result = set(illust_ids[0])
+    #     for r in illust_ids[1:]:
+    #         result.intersection_update(r)
+    #     illust_ids = list(result)
+
+    #     # get page_urls
+    #     result = []
+    #     for illust_id in illust_ids:
+    #         result.extend(
+    #             self.db(
+    #                 """SELECT user.id, user.name, illust_id, page_id, url_original
+    #                     FROM page JOIN user JOIN illust
+    #                     ON page.illust_id=illust.id AND user.id=illust.user_id
+    #                     WHERE illust_id = ?;""", (illust_id, )
+    #             )
+    #         )
+
+    #     return list(result)
+
+    # def _select_page_url_original_by_user_id(self, user_id):
+    #     """return (user.id, user.name, illust.id, page_id, page.url_original)"""
+    #     return self.db(
+    #         """SELECT user.id, user.name, illust.id, page_id, url_original
+    #             FROM user JOIN illust JOIN page
+    #             ON page.illust_id=illust.id AND user.id=illust.user_id
+    #             WHERE user.id = ?;""", (user_id,)
+    #     )
+
+    # def _select_page_url_original_by_illust_id(self, illust_id):
+    #     """return (user.id, user.name, illust.id, page_id, page.url_original)"""
+    #     return self.db(
+    #         """SELECT user.id, user.name, illust.id, page_id, url_original
+    #             FROM user JOIN illust JOIN page
+    #             ON page.illust_id=illust.id AND user.id=illust.user_id
+    #             WHERE illust.id = ?;""", (illust_id,)
+    #     )
