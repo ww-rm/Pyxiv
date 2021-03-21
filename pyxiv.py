@@ -3,8 +3,8 @@ import os
 import random
 import shutil
 import sys
-from pathlib import PurePath
 from datetime import datetime, timedelta, timezone
+from pathlib import PurePath
 
 import wrapper
 from pyxivbase import PyxivBrowser, PyxivConfig, PyxivDatabase
@@ -53,11 +53,10 @@ class PyxivSpider:
             like_count = illust.get("likeCount")
             view_count = illust.get("viewCount")
             upload_date = illust.get("uploadDate")
-            last_update_date = datetime.now(timezone(timedelta())).replace(microsecond=0).isoformat()
             self.db.insert_illust(
                 illust_id, illust_title, illust_description,
                 bookmark_count, like_count, view_count,
-                user_id, upload_date, last_update_date
+                user_id, upload_date
             )
 
             # insert page
@@ -176,11 +175,10 @@ class PyxivSpider:
                 like_count = illust.get("likeCount")
                 view_count = illust.get("viewCount")
                 upload_date = illust.get("uploadDate")
-                last_update_date = datetime.now(timezone(timedelta())).replace(microsecond=0).isoformat()
                 self.db.insert_illust(
                     illust_id, illust_title, illust_description,
                     bookmark_count, like_count, view_count,
-                    user_id, upload_date, last_update_date
+                    user_id, upload_date
                 )
                 # update tag
                 tags = [tag.get("tag") for tag in illust.get("tags").get("tags")]
@@ -405,7 +403,7 @@ class PyxivSpider:
         else:
             return False
 
-    def download_ranking(self, save_dir, p=1, content="all", mode="daily", date=None):
+    def download_ranking(self, save_dir, p=1, content="illust", mode="monthly", date=None):
         """Get ranking, limit 50 illusts info in one page
 
         Args:

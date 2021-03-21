@@ -1,8 +1,11 @@
-import sqlite3
-import requests
-import wrapper
 import json
+import sqlite3
+from datetime import datetime, timedelta, timezone
+
 import bs4
+import requests
+
+import wrapper
 
 
 class PyxivConfig:
@@ -125,10 +128,15 @@ class PyxivDatabase:
         )
 
     @wrapper.database_operation
-    def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id, upload_date, last_update_date):
+    def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id, upload_date):
         self.connection.execute(
             "INSERT INTO illust VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
-            (id_, title, description, bookmark_count, like_count, view_count, user_id, upload_date, last_update_date)
+            (
+                id_, title, description,
+                bookmark_count, like_count, view_count,
+                user_id, upload_date,
+                datetime.now(timezone(timedelta())).replace(microsecond=0).isoformat()
+            )
         )
 
     @wrapper.database_operation

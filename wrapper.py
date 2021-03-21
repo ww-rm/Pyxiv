@@ -1,11 +1,11 @@
 import random
+import sqlite3
+import sys
 from functools import wraps
 from time import sleep
-import sys
-import sqlite3
 
 
-def browser_get(method, log_file=sys.stderr, max_sleep_seconds=3):
+def browser_get(method, log_file=sys.stderr, max_sleep_seconds=1):
     @wraps(method)
     def decorated_method(self, *args, **kwargs):
         sleep(0.1+random.random()*(max_sleep_seconds-0.1))
@@ -20,7 +20,7 @@ def browser_get(method, log_file=sys.stderr, max_sleep_seconds=3):
         return ret
     return decorated_method
 
-def browser_post(method, log_file=sys.stderr, max_sleep_seconds=3):
+def browser_post(method, log_file=sys.stderr, max_sleep_seconds=1):
     @wraps(method)
     def decorated_method(self, *args, **kwargs):
         sleep(0.1+random.random()*(max_sleep_seconds-0.1))
