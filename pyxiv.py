@@ -27,7 +27,7 @@ class PyxivSpider:
     # Save methods begin here
     # Used to save metadata to database, without downloading real pictures
 
-    @wrapper.log_calling_info
+    @wrapper.log_calling_info()
     def save_illust(self, illust_id) -> bool:
         """Store or update full information of an illust, may affect all tables in database
 
@@ -73,7 +73,7 @@ class PyxivSpider:
         else:
             return False
 
-    @wrapper.log_calling_info
+    @wrapper.log_calling_info()
     def save_user(self, user_id) -> bool:
         """Save illusts information of a user, excluding existing illusts
 
@@ -350,7 +350,7 @@ class PyxivSpider:
     # It will first search database for illust information
     # If not found, save_illust will be called before downloading the illust
 
-    @wrapper.log_calling_info
+    @wrapper.log_calling_info()
     def download_page(self, page_url, save_dir) -> bool:
         """Download a page to save_dir"""
         os.makedirs(save_dir, exist_ok=True)
@@ -426,6 +426,9 @@ class PyxivSpider:
             for illust_id in illust_ids:
                 self.download_illust(illust_id, save_dir)
 
+    def download_illusts(self, illust_ids, save_dir, bookmark_illust=False):
+        """download illusts, aimed to fit indexer"""
+        raise NotImplementedError
 
 class PyxivIndexer:
     ...

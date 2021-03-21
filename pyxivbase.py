@@ -65,7 +65,7 @@ class PyxivDatabase:
     def __del__(self):
         self.connection.close()
 
-    @wrapper.database_operation
+    @wrapper.database_operation()
     def __call__(self, sql: str, parameters=None) -> list:
         """A shortcut method for "execute" method to execute sql commands
 
@@ -120,14 +120,14 @@ class PyxivDatabase:
                 );"""
             )
 
-    @wrapper.database_operation
+    @wrapper.database_operation()
     def insert_user(self, id_, name):
         self.connection.execute(
             "INSERT INTO user VALUES (?, ?);",
             (id_, name)
         )
 
-    @wrapper.database_operation
+    @wrapper.database_operation()
     def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id, upload_date):
         self.connection.execute(
             "INSERT INTO illust VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
@@ -139,14 +139,14 @@ class PyxivDatabase:
             )
         )
 
-    @wrapper.database_operation
+    @wrapper.database_operation()
     def insert_page(self, illust_id, page_id, url_original):
         self.connection.execute(
             "INSERT INTO page VALUES (?, ?, ?);",
             (illust_id, page_id, url_original)
         )
 
-    @wrapper.database_operation
+    @wrapper.database_operation()
     def insert_tag(self, name, illust_id):
         self.connection.execute(
             "INSERT INTO tag VALUES (?, ?);",
@@ -209,7 +209,7 @@ class PyxivBrowser:
     def __del__(self):
         self.session.close()
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def _get_csrf_token(self):
         """Get x-csrf-token"""
         html = self.session.get(PyxivBrowser.url_host).text
@@ -219,15 +219,15 @@ class PyxivBrowser:
 
     # GET method
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_page(self, page_url) -> bytes:
         response = self.session.get(page_url)
         if response.status_code != requests.codes["ok"]:
             return b""
         return response.content
 
-    @wrapper.cookies_required
-    @wrapper.browser_get
+    @wrapper.cookies_required()
+    @wrapper.browser_get()
     def get_top_illust(self, mode="all") -> dict:
         """Get top illusts by mode
 
@@ -237,7 +237,7 @@ class PyxivBrowser:
         json_ = self.session.get(PyxivBrowser.ajax_top_illust, params={"mode": mode}).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_search_artworks(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="all") -> dict:
         """Get search artworks result
 
@@ -259,7 +259,7 @@ class PyxivBrowser:
             }).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="illust") -> dict:
         """Get search illustration or ugoira result
 
@@ -281,7 +281,7 @@ class PyxivBrowser:
             }).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_search_manga(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="manga") -> dict:
         """Get search manga result
 
@@ -303,17 +303,17 @@ class PyxivBrowser:
             }).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_illust(self, illust_id) -> dict:
         json_ = self.session.get(PyxivBrowser.ajax_illust.format(illust_id=illust_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_illust_pages(self, illust_id) -> list:
         json_ = self.session.get(PyxivBrowser.ajax_illust_pages.format(illust_id=illust_id)).json()
         return [] if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_illust_recommend_init(self, illust_id, limit=1) -> dict:
         """details.keys()"""
         json_ = self.session.get(
@@ -322,13 +322,13 @@ class PyxivBrowser:
         ).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_user(self, user_id) -> dict:
         json_ = self.session.get(PyxivBrowser.ajax_user.format(user_id=user_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.cookies_required
-    @wrapper.browser_get
+    @wrapper.cookies_required()
+    @wrapper.browser_get()
     def get_user_following(self, user_id, offset, limit=50, rest="show") -> dict:
         """Get following list of a user
 
@@ -346,8 +346,8 @@ class PyxivBrowser:
         ).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.cookies_required
-    @wrapper.browser_get
+    @wrapper.cookies_required()
+    @wrapper.browser_get()
     def get_user_recommends(self, user_id, userNum=100, workNum=3, isR18=True) -> dict:
         """Get recommends of a user
 
@@ -365,17 +365,17 @@ class PyxivBrowser:
         ).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_user_profile_all(self, user_id) -> dict:
         json_ = self.session.get(PyxivBrowser.ajax_user_profile_all.format(user_id=user_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_user_profile_top(self, user_id) -> dict:
         json_ = self.session.get(PyxivBrowser.ajax_user_profile_top.format(user_id=user_id)).json()
         return {} if json_.get("error") is True else json_.get("body")
 
-    @wrapper.browser_get
+    @wrapper.browser_get()
     def get_ranking(self, p=1, content="all", mode="daily", date: str = None) -> dict:
         """Get ranking, limit 50 illusts info in one page
 
@@ -398,8 +398,8 @@ class PyxivBrowser:
         ).json()
         return {} if json_.get("error") else json_
 
-    @wrapper.cookies_required
-    @wrapper.browser_get
+    @wrapper.cookies_required()
+    @wrapper.browser_get()
     def get_rpc_recommender(self, sample_illusts: int, num_recommendations=500, type_="illust") -> list:
         """Deprecated, used to get recommended illust ids
 
@@ -419,16 +419,16 @@ class PyxivBrowser:
         return [] if json_.get("error") else json_.get("recommendations")
 
     # POST method
-    @wrapper.cookies_required
-    @wrapper.browser_post
+    @wrapper.cookies_required()
+    @wrapper.browser_post()
     def post_illusts_bookmarks_add(self, illust_id, restrict=0, comment="", tags=None):
         """Bookmark an illust
 
         """
         raise NotImplementedError
 
-    @wrapper.cookies_required
-    @wrapper.browser_post
+    @wrapper.cookies_required()
+    @wrapper.browser_post()
     def post_bookmark_add(self, user_id, mode="add", type_="user", tag="", restrict="", format="json"):
         """Follow a user
 
