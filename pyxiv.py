@@ -1,8 +1,5 @@
-import json
 import os
 import random
-import shutil
-import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import PurePath
 
@@ -19,7 +16,7 @@ class PyxivSpider:
         download_*: download specifed pictures to local path
     """
 
-    def __init__(self, config):
+    def __init__(self, config: PyxivConfig):
         self.config = config
         self.browser = PyxivBrowser(self.config.proxies, self.config.cookies)
         self.db = PyxivDatabase(self.config.db_path)
@@ -265,7 +262,7 @@ class PyxivSpider:
                 else:
                     seed_user_ids.add(user_id)  # not remove it
 
-    def crawl_by_user_followings(self, seed_user_ids: set = None, max_user_num: int = 100):
+    def crawl_by_user_followings(self, seed_user_ids: set = None, max_user_num: int = 300):
         """Crawl by followings
 
         Args:
@@ -279,7 +276,7 @@ class PyxivSpider:
 
         return self._crawl_by_user(self._get_user_id_by_followings, seed_user_ids, max_user_num)
 
-    def crawl_by_user_recommends(self, seed_user_ids: set = None, max_user_num: int = 100):
+    def crawl_by_user_recommends(self, seed_user_ids: set = None, max_user_num: int = 300):
         """Crawl by recommends
 
         Args:
@@ -293,7 +290,7 @@ class PyxivSpider:
 
         return self._crawl_by_user(self._get_user_id_by_recommends, seed_user_ids, max_user_num)
 
-    def crawl_by_illust_recommends(self, seed_illust_ids: set = None, max_illust_num: int = 5000):
+    def crawl_by_illust_recommends(self, seed_illust_ids: set = None, max_illust_num: int = 30000):
         """Crawl by illust recommends
 
         Args:
@@ -333,7 +330,7 @@ class PyxivSpider:
                 illust_recommend_init = self.browser.get_illust_recommend_init(illust_id)
                 if illust_recommend_init:
                     seed_illust_ids.update(
-                        set(illust_recommend_init.get("details").keys())
+                        set(dict(illust_recommend_init.get("details")).keys()) # prevent to get empty list
                         .difference(exist_illust_ids)
                         .difference(saved_illust_ids)
                     )
