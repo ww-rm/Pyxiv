@@ -4,6 +4,7 @@ import random
 import shutil
 import sys
 from pathlib import PurePath
+from datetime import datetime, timedelta, timezone
 
 import wrapper
 from pyxivbase import PyxivBrowser, PyxivConfig, PyxivDatabase
@@ -51,7 +52,13 @@ class PyxivSpider:
             bookmark_count = illust.get("bookmarkCount")
             like_count = illust.get("likeCount")
             view_count = illust.get("viewCount")
-            self.db.insert_illust(illust_id, illust_title, illust_description, bookmark_count, like_count, view_count, user_id)
+            upload_date = illust.get("uploadDate")
+            last_update_date = datetime.now(timezone(timedelta())).replace(microsecond=0).isoformat()
+            self.db.insert_illust(
+                illust_id, illust_title, illust_description,
+                bookmark_count, like_count, view_count,
+                user_id, upload_date, last_update_date
+            )
 
             # insert page
             page_urls = [page.get("urls").get("original") for page in pages]
@@ -132,13 +139,57 @@ class PyxivSpider:
     def update_illusts_info(self):
         """Update information of all illusts stored in database"""
 
-        illust_ids = [row[0] for row in self.db("SELECT id FROM illust")]
-        for illust_id in illust_ids:
-            self.save_illust(illust_id)
+        illust_ids = self.db("SELECT id, upload_date, last_update_date FROM illust")
+        now_date = datetime.now(timezone(timedelta())).replace(microsecond=0)
+        illust_ids_need_to_update = []
+        for illust_id, upload_date, last_update_date in illust_ids:
+            upload_date = datetime.fromisoformat(upload_date)
+            last_update_date = datetime.fromisoformat(last_update_date)
+            if (now_date - upload_date).days <= 7:
+                if (now_date - last_update_date).days > 1:
+                    illust_ids_need_to_update.append(illust_id)
+            elif (now_date - upload_date).days <= 30:
+                if (now_date - last_update_date).days > 7:
+                    illust_ids_need_to_update.append(illust_id)
+            elif (now_date - upload_date).days <= 365:
+                if (now_date - last_update_date).days > 30:
+                    illust_ids_need_to_update.append(illust_id)
+            elif (now_date - upload_date).days <= 365*5:
+                if (now_date - last_update_date).days > 30*3:
+                    illust_ids_need_to_update.append(illust_id)
+            else:
+                if (now_date - last_update_date).days > 30*6:
+                    illust_ids_need_to_update.append(illust_id)
 
-    # Crawl methods begin here
-    # Used to automatic crawl metadata
-    # by user followings or pixiv recommends 
+        print("{} illusts need to be updated...".format(len(illust_ids_need_to_update)))
+        for illust_id in illust_ids_need_to_update:
+            # XXX: self.save_illust(illust_id)
+            print(illust_id)
+            # just update illust information, without pages
+            illust = self.browser.get_illust(illust_id)
+            if illust:
+                user_id = illust.get("userId")
+                # update illust
+                illust_title = illust.get("title")
+                illust_description = illust.get("description")
+                bookmark_count = illust.get("bookmarkCount")
+                like_count = illust.get("likeCount")
+                view_count = illust.get("viewCount")
+                upload_date = illust.get("uploadDate")
+                last_update_date = datetime.now(timezone(timedelta())).replace(microsecond=0).isoformat()
+                self.db.insert_illust(
+                    illust_id, illust_title, illust_description,
+                    bookmark_count, like_count, view_count,
+                    user_id, upload_date, last_update_date
+                )
+                # update tag
+                tags = [tag.get("tag") for tag in illust.get("tags").get("tags")]
+                for name in tags:
+                    self.db.insert_tag(name, illust_id)
+
+        # Crawl methods begin here
+        # Used to automatic crawl metadata
+        # by user followings or pixiv recommends
 
     def _get_user_id_by_followings(self, user_id) -> list:
         """Return: [int(id), ...]"""
@@ -165,7 +216,7 @@ class PyxivSpider:
 
         return user_recommends
 
-    def _crawl(self, f_expand, seed_user_ids: set, max_user_num: int):
+    def _crawl_by_user(self, f_expand, seed_user_ids: set, max_user_num: int):
         """Crawl by f_expand
 
         Args:
@@ -213,8 +264,10 @@ class PyxivSpider:
             if not (user_id in exist_user_ids or user_id in saved_user_ids):
                 if self.save_user(user_id):
                     saved_user_ids.add(user_id)
+                else:
+                    seed_user_ids.add(user_id)  # not remove it
 
-    def crawl_by_followings(self, seed_user_ids: set = None, max_user_num: int = 5000):
+    def crawl_by_user_followings(self, seed_user_ids: set = None, max_user_num: int = 100):
         """Crawl by followings
 
         Args:
@@ -226,9 +279,9 @@ class PyxivSpider:
             The max_user_num will exclude all existing user in database.
         """
 
-        return self._crawl(self._get_user_id_by_followings, seed_user_ids, max_user_num)
+        return self._crawl_by_user(self._get_user_id_by_followings, seed_user_ids, max_user_num)
 
-    def crawl_by_recommends(self, seed_user_ids: set = None, max_user_num: int = 5000):
+    def crawl_by_user_recommends(self, seed_user_ids: set = None, max_user_num: int = 100):
         """Crawl by recommends
 
         Args:
@@ -240,7 +293,59 @@ class PyxivSpider:
             The max_user_num will exclude all existing user in database.
         """
 
-        return self._crawl(self._get_user_id_by_recommends, seed_user_ids, max_user_num)
+        return self._crawl_by_user(self._get_user_id_by_recommends, seed_user_ids, max_user_num)
+
+    def crawl_by_illust_recommends(self, seed_illust_ids: set = None, max_illust_num: int = 5000):
+        """Crawl by illust recommends
+
+        Args:
+            seed_illust_ids: A set of int or None, if not a empty set, the spider use it as primary seeds,
+            if None, it will use illust ids exist in database for seeds.
+            max_illust_num: The max user num of crawling in one time
+
+        Note:
+            The max_illust_num will exclude all existing illust in database.
+        """
+
+        # get exist user ids
+        exist_illust_ids = list(row[0] for row in self.db("SELECT id FROM illust;"))
+
+        # prepare seeds
+        if seed_illust_ids is None:
+            seed_illust_ids = exist_illust_ids.copy()
+            # be sure to random choose seed user from database
+            for _ in range(10000):
+                random.shuffle(seed_illust_ids)
+            seed_illust_ids = seed_illust_ids[: 50]  # use 50 for seeds
+
+        # BFS crawl critierion
+        # queue: seed_illust_ids: [id, ...]
+        # saved: saved_illust_ids: [id, ...]
+        # exist: exist_illust_ids: [id, ...]
+        seed_illust_ids = set(map(int, seed_illust_ids))  # be sure int id
+        saved_illust_ids = set()
+        exist_illust_ids = set(exist_illust_ids)
+        # for each seed illust id, get its expand illust ids
+        while len(seed_illust_ids) > 0 and len(saved_illust_ids) < max_illust_num:
+            illust_id = seed_illust_ids.pop()
+
+            # add new_user_ids to seed_illust_ids
+            # and limit the length of seed_illust_ids
+            if len(seed_illust_ids) < 100000:
+                illust_recommend_init = self.browser.get_illust_recommend_init(illust_id)
+                if illust_recommend_init:
+                    seed_illust_ids.update(
+                        set(illust_recommend_init.get("details").keys())
+                        .difference(exist_illust_ids)
+                        .difference(saved_illust_ids)
+                    )
+
+            # check if save current illust_id
+            if not (illust_id in exist_illust_ids or illust_id in saved_illust_ids):
+                if self.save_illust(illust_id):
+                    saved_illust_ids.add(illust_id)
+                else:
+                    seed_illust_ids.add(illust_id)  # not remove it
 
     # Retrieve methods begin here
     # Used to retrieve pictures to config save_path by specific scope
@@ -347,6 +452,23 @@ class PyxivSpider:
         else:
             return False
 
-    def download_popular(self, save_dir, mode="all", top_num=100):
-        ...
-        # TODO
+    def download_ranking(self, save_dir, p=1, content="all", mode="daily"):
+        """Get ranking, limit 50 illusts info in one page
+
+        Args:
+            p: page number, >= 1
+            content: 
+                "all": mode[Any]
+                "illust": mode["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie"]
+                "ugoira"(動イラスト): mode["daily", "weekly", "daily_r18", "weekly_r18"]
+                "manga": mode["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie"]
+            mode: ["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie", 
+                "original", "male", "male_r18", "female", "female_r18"]
+
+        Note: May need cookies to get r18 ranking
+        """
+        ranking = self.browser.get_ranking(p, content, mode)
+        if ranking:
+            illust_ids = [e.get("illust_id") for e in ranking.get("contents")]
+            for illust_id in illust_ids:
+                self.download_illust(illust_id, save_dir)

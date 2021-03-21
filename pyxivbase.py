@@ -32,6 +32,8 @@ class PyxivDatabase:
             "like_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
             "view_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
             "user_id" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "upload_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
+            "last_update_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
             PRIMARY KEY ("id") ON CONFLICT REPLACE,
             FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE CASCADE
         );
@@ -91,6 +93,8 @@ class PyxivDatabase:
                     "like_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
                     "view_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
                     "user_id" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "upload_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
+                    "last_update_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
                     PRIMARY KEY ("id") ON CONFLICT REPLACE,
                     FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE CASCADE
                 );"""
@@ -121,10 +125,10 @@ class PyxivDatabase:
         )
 
     @wrapper.database_operation
-    def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id):
+    def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id, upload_date, last_update_date):
         self.connection.execute(
-            "INSERT INTO illust VALUES (?, ?, ?, ?, ?, ?, ?);",
-            (id_, title, description, bookmark_count, like_count, view_count, user_id)
+            "INSERT INTO illust VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+            (id_, title, description, bookmark_count, like_count, view_count, user_id, upload_date, last_update_date)
         )
 
     @wrapper.database_operation
@@ -302,10 +306,10 @@ class PyxivBrowser:
         return [] if json_.get("error") is True else json_.get("body")
 
     @wrapper.browser_get
-    def get_illust_recommend_init(self, limit=1) -> dict:
+    def get_illust_recommend_init(self, illust_id, limit=1) -> dict:
         """details.keys()"""
         json_ = self.session.get(
-            PyxivBrowser.ajax_illust_recommend_init,
+            PyxivBrowser.ajax_illust_recommend_init.format(illust_id=illust_id),
             params={"limit": limit}
         ).json()
         return {} if json_.get("error") is True else json_.get("body")

@@ -9,6 +9,6 @@ if __name__ == "__main__":
     config = PyxivConfig(args.config)
 
     spider = PyxivSpider(config)
-    spider.save_top_illust()
-    # spider.crawl_by_recommends()
+    # spider.crawl_by_user_recommends([3452804, 6662895, 9930155, 13379747, 22124330, 26352420])
+    spider.update_illusts_info()
     
