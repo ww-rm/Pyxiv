@@ -184,6 +184,7 @@ class PyxivBrowser:
     ajax_illusts_bookmarks_add = "https://www.pixiv.net/ajax/illusts/bookmarks/add"  # comment:"" illust_id:"" restrict:0 tags:[]
 
     # php
+    php_login = ""
     php_logout = ""  # TODO
     php_ranking = "https://www.pixiv.net/ranking.php"  # ?format=json&p=1&mode=daily&content=all
     php_rpc_recommender = "https://www.pixiv.net/rpc/recommender.php"  # ?type=illust&sample_illusts=88548686&num_recommendations=500
@@ -419,6 +420,12 @@ class PyxivBrowser:
         return [] if json_.get("error") else json_.get("recommendations")
 
     # POST method
+
+    @wrapper.cookies_required()
+    @wrapper.browser_post()
+    def post_logout(self):
+        ...
+
     @wrapper.cookies_required()
     @wrapper.browser_post()
     def post_illusts_bookmarks_add(self, illust_id, restrict=0, comment="", tags=None):

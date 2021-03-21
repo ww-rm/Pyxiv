@@ -80,7 +80,7 @@ class PyxivSpider:
         result = False
         user_all = self.browser.get_user_profile_all(user_id)
         if user_all:
-            all_illust_ids = set(map(int, user_all.get("illusts").keys()))
+            all_illust_ids = set(map(int, user_all.get("illusts")))
             exist_illust_ids = [row[0] for row in self.db("SELECT id FROM illust WHERE user_id = ?", (user_id,))]
             if exist_illust_ids:
                 result = True
@@ -330,7 +330,7 @@ class PyxivSpider:
                 illust_recommend_init = self.browser.get_illust_recommend_init(illust_id)
                 if illust_recommend_init:
                     seed_illust_ids.update(
-                        set(dict(illust_recommend_init.get("details")).keys()) # prevent to get empty list
+                        set(illust_recommend_init.get("details")) # actually a dict or empty list
                         .difference(exist_illust_ids)
                         .difference(saved_illust_ids)
                     )
