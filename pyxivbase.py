@@ -70,12 +70,15 @@ class PyxivDatabase:
         """A shortcut method for "execute" method to execute sql commands
 
         Returns:
-            Always returns the fetchall() of a cursor object
+            Always returns the fetchall() of a cursor object, return [] when no result
         """
         if parameters:
             return self.connection.execute(sql, parameters).fetchall()
         else:
             return self.connection.execute(sql).fetchall()
+
+    def __len__(self):
+        return len(self.connection.execute("SELECT id FROM illust;").fetchall())
 
     def _init(self):
         cursor = self.connection.execute("SELECT name FROM sqlite_master WHERE type='table';")

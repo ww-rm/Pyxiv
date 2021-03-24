@@ -461,10 +461,10 @@ class PyxivIndexer:
     O_VIEW = 2
 
     def __init__(self, db_path):
-        self.__scope = PyxivIndexer.S_TAG
-        self.__mode = PyxivIndexer.M_SAFE
+        self.__scope = PyxivIndexer.S_ALL
+        self.__mode = PyxivIndexer.M_ALL
         self.__query = PyxivIndexer.Q_FUZZY
-        self.__include = PyxivIndexer.I_AND
+        self.__include = PyxivIndexer.I_OR
         self.__order = PyxivIndexer.O_LIKE
         self.db = PyxivDatabase(db_path)
 
@@ -530,19 +530,15 @@ class PyxivIndexer:
             includes: a list includes texts you want to search
 
         Returns:
-            A list consist of two-tuples, like (key, illust_id), where key is specified by order property
+            A list consist of two-tuples, like (illust_id, key), where key is specified by order property
         """
-
-        # fuzzy query
-        if self.query == PyxivIndexer.Q_FUZZY:
-            includes = ["%"+e+"%" for e in includes]
 
         o_value = {
             PyxivIndexer.O_LIKE: "like_count",
             PyxivIndexer.O_BOOKMARK: "bookmark_count",
             PyxivIndexer.O_VIEW: "view_count"
         }
-        q_sql = {
+        q_where = {
             PyxivIndexer.Q_FUZZY: {
                 "tag": " (name LIKE ?) ",
                 "td": " (title LIKE ? OR description LIKE ?) "
@@ -553,19 +549,25 @@ class PyxivIndexer:
             }
         }
 
+        # fuzzy query
+        if self.query == PyxivIndexer.Q_FUZZY:
+            includes = ["%"+e+"%" for e in includes]
+
+        # sql command
         sql_full = "SELECT id, {order} FROM illust;".format(order=o_value[self.order])
         sql_tag = "SELECT DISTINCT id, {order} FROM illust JOIN tag ON illust.id = tag.illust_id WHERE {where};".format(
             order=o_value[self.order],
-            where=q_sql[self.query]["tag"])
+            where=q_where[self.query]["tag"])
         sql_td = "SELECT id, {order} FROM illust WHERE {where};".format(
             order=o_value[self.order],
-            where=q_sql[self.query]["td"]
+            where=q_where[self.query]["td"]
         )
         sql_r18 = "SELECT DISTINCT illust_id FROM tag WHERE name = 'R-18';"
 
         result_set = set(self.db(sql_full))
+
+        # get tag and td sets
         if includes:
-            # get tag and td sets
             tag_sets = []
             td_sets = []
             for name in includes:
@@ -594,14 +596,20 @@ class PyxivIndexer:
             else:
                 result_set.intersection_update(tag_set.union(td_set))
 
+        # except or intersect R18 set
+        r18_set = set(self.db(sql_r18))
+        if self.mode == PyxivIndexer.M_SAFE:
+            result_set.difference_update(r18_set)
+        elif self.mode == PyxivIndexer.M_R18:
+            result_set.intersection_update(r18_set)
+
+        # descend result set
         result = sorted(result_set, key=lambda e: e[1], reverse=True)
-        print(len(result))
         return result
 
 
 if __name__ == "__main__":
     a = PyxivIndexer("./data/db/pyxiv.db")
-    a.scope = PyxivIndexer.S_ALL
-    a.mode = PyxivIndexer.M_ALL
-    a.include = PyxivIndexer.I_OR
-    (a.search(["azurlane", "アズールレーン"]))
+    r = a.search(["アズールレーン"])
+    print(len(a.db))
+    print(len(r))
