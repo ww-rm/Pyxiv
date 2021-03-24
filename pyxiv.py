@@ -225,11 +225,11 @@ class PyxivSpider:
         """
 
         # get exist user ids
-        exist_user_ids = list(row[0] for row in self.db("SELECT id FROM user;"))
+        exist_user_ids = list(row[0] for row in self.db("SELECT DISTINCT user_id FROM illust ORDER BY bookmark_count DESC;"))
 
         # prepare seeds
         if seed_user_ids is None:
-            seed_user_ids = exist_user_ids.copy()
+            seed_user_ids = exist_user_ids[: 1000].copy()
             # be sure to random choose seed user from database
             for _ in range(10000):
                 random.shuffle(seed_user_ids)
@@ -248,7 +248,7 @@ class PyxivSpider:
 
             # add new_user_ids to seed_user_ids
             # and limit the length of seed_user_ids
-            if len(seed_user_ids) < 100000:
+            if len(seed_user_ids) < 1000000:
                 seed_user_ids.update(
                     set(f_expand(user_id))
                     .difference(exist_user_ids)
@@ -303,15 +303,15 @@ class PyxivSpider:
         """
 
         # get exist user ids
-        exist_illust_ids = list(row[0] for row in self.db("SELECT id FROM illust;"))
+        exist_illust_ids = list(row[0] for row in self.db("SELECT id FROM illust ORDER BY bookmark_count DESC;"))
 
         # prepare seeds
         if seed_illust_ids is None:
-            seed_illust_ids = exist_illust_ids.copy()
+            seed_illust_ids = exist_illust_ids[: 10000].copy()
             # be sure to random choose seed user from database
-            for _ in range(10000):
+            for _ in range(100000):
                 random.shuffle(seed_illust_ids)
-            seed_illust_ids = seed_illust_ids[: 50]  # use 50 for seeds
+            seed_illust_ids = seed_illust_ids[: 100]  # use 100 for seeds
 
         # BFS crawl critierion
         # queue: seed_illust_ids: [id, ...]
@@ -326,11 +326,11 @@ class PyxivSpider:
 
             # add new_user_ids to seed_illust_ids
             # and limit the length of seed_illust_ids
-            if len(seed_illust_ids) < 100000:
+            if len(seed_illust_ids) < 1000000:
                 illust_recommend_init = self.browser.get_illust_recommend_init(illust_id)
                 if illust_recommend_init:
                     seed_illust_ids.update(
-                        set(illust_recommend_init.get("details")) # actually a dict or empty list
+                        set(illust_recommend_init.get("details"))  # actually a dict or empty list
                         .difference(exist_illust_ids)
                         .difference(saved_illust_ids)
                     )
@@ -427,51 +427,181 @@ class PyxivSpider:
         """download illusts, aimed to fit indexer"""
         raise NotImplementedError
 
+
 class PyxivIndexer:
-    ...
-    # Retrieve methods begin here
-    # Used to retrieve pictures to config save_path by specific scope
+    """
+    Attrs:
+        scope: search scope, in tag, or title and description, or in all
+        mode: search mode, safe or r18 or both
+        query: search match fuzzy or exactly
+        include: whether use AND or OR to process query keywords
+        order: result order by, always descending
+    """
+    # search scope
+    S_TAG = 0
+    S_TD = 1
+    S_ALL = 2
 
-    # def _select_page_url_original_by_tag(self, names):
-    #     """return (user.id, user.name, illust.id, page.page_id, page.url_original)"""
-    #     illust_ids = []
-    #     for name in names:
-    #         illust_ids.append([row[0] for row in self.db("SELECT illust_id FROM tag WHERE name = ?;", (name,))])
+    # search mode
+    M_SAFE = 0
+    M_R18 = 1
+    M_ALL = 2
 
-    #     # intersect
-    #     result = set(illust_ids[0])
-    #     for r in illust_ids[1:]:
-    #         result.intersection_update(r)
-    #     illust_ids = list(result)
+    # search
+    Q_FUZZY = 0
+    Q_EXACTLY = 1
 
-    #     # get page_urls
-    #     result = []
-    #     for illust_id in illust_ids:
-    #         result.extend(
-    #             self.db(
-    #                 """SELECT user.id, user.name, illust_id, page_id, url_original
-    #                     FROM page JOIN user JOIN illust
-    #                     ON page.illust_id=illust.id AND user.id=illust.user_id
-    #                     WHERE illust_id = ?;""", (illust_id, )
-    #             )
-    #         )
+    # include mode
+    I_AND = 0
+    I_OR = 1
 
-    #     return list(result)
+    # order by
+    O_LIKE = 0
+    O_BOOKMARK = 1
+    O_VIEW = 2
 
-    # def _select_page_url_original_by_user_id(self, user_id):
-    #     """return (user.id, user.name, illust.id, page_id, page.url_original)"""
-    #     return self.db(
-    #         """SELECT user.id, user.name, illust.id, page_id, url_original
-    #             FROM user JOIN illust JOIN page
-    #             ON page.illust_id=illust.id AND user.id=illust.user_id
-    #             WHERE user.id = ?;""", (user_id,)
-    #     )
+    def __init__(self, db_path):
+        self.__scope = PyxivIndexer.S_TAG
+        self.__mode = PyxivIndexer.M_SAFE
+        self.__query = PyxivIndexer.Q_FUZZY
+        self.__include = PyxivIndexer.I_AND
+        self.__order = PyxivIndexer.O_LIKE
+        self.db = PyxivDatabase(db_path)
 
-    # def _select_page_url_original_by_illust_id(self, illust_id):
-    #     """return (user.id, user.name, illust.id, page_id, page.url_original)"""
-    #     return self.db(
-    #         """SELECT user.id, user.name, illust.id, page_id, url_original
-    #             FROM user JOIN illust JOIN page
-    #             ON page.illust_id=illust.id AND user.id=illust.user_id
-    #             WHERE illust.id = ?;""", (illust_id,)
-    #     )
+    @property
+    def scope(self):
+        return self.__scope
+
+    @scope.setter
+    def scope(self, value):
+        if value in (PyxivIndexer.S_TAG, PyxivIndexer.S_TD, PyxivIndexer.S_ALL):
+            self.__scope = value
+        else:
+            raise ValueError("Unknown scope value: {}".format(value))
+
+    @property
+    def mode(self):
+        return self.__mode
+
+    @mode.setter
+    def mode(self, value):
+        if value in (PyxivIndexer.M_SAFE, PyxivIndexer.M_R18, PyxivIndexer.M_ALL):
+            self.__mode = value
+        else:
+            raise ValueError("Unknown mode value: {}".format(value))
+
+    @property
+    def query(self):
+        return self.__query
+
+    @query.setter
+    def query(self, value):
+        if value in (PyxivIndexer.Q_FUZZY, PyxivIndexer.Q_EXACTLY):
+            self.__query = value
+        else:
+            raise ValueError("Unknown query value: {}".format(value))
+
+    @property
+    def include(self):
+        return self.__include
+
+    @include.setter
+    def include(self, value):
+        if value in (PyxivIndexer.I_AND, PyxivIndexer.I_OR):
+            self.__include = value
+        else:
+            raise ValueError("Unknown include value: {}".format(value))
+
+    @property
+    def order(self):
+        return self.__order
+
+    @order.setter
+    def order(self, value):
+        if value in (PyxivIndexer.O_LIKE, PyxivIndexer.O_BOOKMARK, PyxivIndexer.O_VIEW):
+            self.__order = value
+        else:
+            raise ValueError("Unknown order value: {}".format(value))
+
+    def search(self, includes: list) -> list:
+        """search specified illusts
+
+        Args:
+            includes: a list includes texts you want to search
+
+        Returns:
+            A list consist of two-tuples, like (key, illust_id), where key is specified by order property
+        """
+
+        # fuzzy query
+        if self.query == PyxivIndexer.Q_FUZZY:
+            includes = ["%"+e+"%" for e in includes]
+
+        o_value = {
+            PyxivIndexer.O_LIKE: "like_count",
+            PyxivIndexer.O_BOOKMARK: "bookmark_count",
+            PyxivIndexer.O_VIEW: "view_count"
+        }
+        q_sql = {
+            PyxivIndexer.Q_FUZZY: {
+                "tag": " (name LIKE ?) ",
+                "td": " (title LIKE ? OR description LIKE ?) "
+            },
+            PyxivIndexer.Q_EXACTLY: {
+                "tag": " (name = ?) ",
+                "td": " (title = ? OR description = ?) "
+            }
+        }
+
+        sql_full = "SELECT id, {order} FROM illust;".format(order=o_value[self.order])
+        sql_tag = "SELECT DISTINCT id, {order} FROM illust JOIN tag ON illust.id = tag.illust_id WHERE {where};".format(
+            order=o_value[self.order],
+            where=q_sql[self.query]["tag"])
+        sql_td = "SELECT id, {order} FROM illust WHERE {where};".format(
+            order=o_value[self.order],
+            where=q_sql[self.query]["td"]
+        )
+        sql_r18 = "SELECT DISTINCT illust_id FROM tag WHERE name = 'R-18';"
+
+        result_set = set(self.db(sql_full))
+        if includes:
+            # get tag and td sets
+            tag_sets = []
+            td_sets = []
+            for name in includes:
+                tag_sets.append(set(self.db(sql_tag, (name,))))
+                td_sets.append(set(self.db(sql_td, (name, name))))
+            tag_set = tag_sets[0].copy()
+            td_set = td_sets[0].copy()
+
+            # keywords AND or OR
+            if self.include == PyxivIndexer.I_AND:
+                for set_ in tag_sets:
+                    tag_set.intersection_update(set_)
+                for set_ in td_sets:
+                    td_set.intersection_update(set_)
+            else:
+                for set_ in tag_sets:
+                    tag_set.update(set_)
+                for set_ in td_sets:
+                    td_set.update(set_)
+
+            # {full} intersect ({tag} union {td})
+            if self.scope == PyxivIndexer.S_TAG:
+                result_set.intersection_update(tag_set)
+            elif self.scope == PyxivIndexer.S_TD:
+                result_set.intersection_update(td_set)
+            else:
+                result_set.intersection_update(tag_set.union(td_set))
+
+        result = sorted(result_set, key=lambda e: e[1], reverse=True)
+        print(len(result))
+        return result
+
+
+if __name__ == "__main__":
+    a = PyxivIndexer("./data/db/pyxiv.db")
+    a.scope = PyxivIndexer.S_ALL
+    a.mode = PyxivIndexer.M_ALL
+    a.include = PyxivIndexer.I_OR
+    (a.search(["azurlane", "アズールレーン"]))
