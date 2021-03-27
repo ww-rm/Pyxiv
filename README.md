@@ -16,6 +16,10 @@ A small tool to download images on pixiv.
 - Before download an illust, first look up metadata in database to save time; if not found, will store to database
 - Support to search popular illusts in local database by crawling with sufficient metadata
 
+## **Important**
+
+**LIMIT YOUR SPEED AND NOT PUT HEAVY PRESSURE TO PIXIV'S SERVER!!!**
+
 ---
 
 *If you think this project is helpful to you, plz star it and let more people see it. :)*
