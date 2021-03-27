@@ -132,4 +132,4 @@ dmypy.json
 *.lnk
 *.db
 db/
-image/
+data/image
