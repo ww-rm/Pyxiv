@@ -188,7 +188,7 @@ class PyxivBrowser:
 
     # php
     php_login = ""
-    php_logout = ""  # TODO
+    php_logout = "https://www.pixiv.net/logout.php"  # ?return_to=%2F
     php_ranking = "https://www.pixiv.net/ranking.php"  # ?format=json&p=1&mode=daily&content=all
     php_rpc_recommender = "https://www.pixiv.net/rpc/recommender.php"  # ?type=illust&sample_illusts=88548686&num_recommendations=500
     php_bookmark_add = "https://www.pixiv.net/bookmark_add.php"  # mode:"add" type:"user" user_id:"" tag:"" restrict:"" format:"json"
@@ -218,7 +218,7 @@ class PyxivBrowser:
         """Get x-csrf-token"""
         html = self.session.get(PyxivBrowser.url_host).text
         soup = bs4.BeautifulSoup(html, "lxml")
-        token = json.loads(soup.find("meta", {"id": "meta-global-data"}).attrs.content).get("token")
+        token = json.loads(soup.find("meta", {"id": "meta-global-data"}).attrs.get("content")).get("token")
         return token
 
     # GET method
@@ -226,7 +226,7 @@ class PyxivBrowser:
     @wrapper.browser_get()
     def get_page(self, page_url) -> bytes:
         response = self.session.get(page_url)
-        if response.status_code != requests.codes["ok"]:
+        if response.status_code != 200:
             return b""
         return response.content
 
@@ -422,25 +422,80 @@ class PyxivBrowser:
         ).json()
         return [] if json_.get("error") else json_.get("recommendations")
 
+    @wrapper.browser_post()
+    def get_logout(self) -> bool:
+        """Logout"""
+        response = self.session.get(PyxivBrowser.php_logout, params={"return_to": "/"})
+        return True
+
     # POST method
 
     @wrapper.cookies_required()
     @wrapper.browser_post()
-    def post_logout(self):
-        ...
+    def post_illusts_bookmarks_add(self, illust_id, restrict: int = 0, comment: str = "", tags: list = None) -> bool:
+        """Add or modify bookmark of an illust
+
+        Args:
+            illust_id: illust id
+            restrict: 0 for public, 1 for private
+            comment: comment
+            tags: a list contains string tags, can be empty list
+        """
+
+        json_ = self.session.post(
+            PyxivBrowser.ajax_illusts_bookmarks_add,
+            data=json.dumps(
+                {
+                    "illust_id": illust_id,
+                    "restrict": restrict,
+                    "comment": comment,
+                    "tags": tags
+                }
+            ),
+            headers={
+                "Content-Type": "application/json; charset=utf-8",  # 422
+                "x-csrf-token": self._get_csrf_token()  # 400
+            }
+        ).json()
+        return False if json_.get("error") else True
 
     @wrapper.cookies_required()
     @wrapper.browser_post()
-    def post_illusts_bookmarks_add(self, illust_id, restrict=0, comment="", tags=None):
-        """Bookmark an illust
+    def post_bookmark_add(self, user_id, restrict=0, tag="", mode="add", type_="user") -> bool:
+        """Add or modify bookmark of a user
 
+        Args:
+            user_id: user id
+            restrict: 0 for public, 1 for private
+            tag: Unknown
+            mode: No need to care
+            type_: No need to care
         """
-        raise NotImplementedError
+        response = self.session.post(
+            PyxivBrowser.php_bookmark_add,
+            data={
+                "user_id": user_id,
+                "restrict": restrict,
+                "tag": tag,
+                "mode": mode,
+                "type": type_,
+                "format": "json"
+            },
+            headers={
+                "x-csrf-token": self._get_csrf_token()  # 404
+            }
+        )
+        return False if response.status_code != 200 else True
 
-    @wrapper.cookies_required()
-    @wrapper.browser_post()
-    def post_bookmark_add(self, user_id, mode="add", type_="user", tag="", restrict="", format="json"):
-        """Follow a user
 
-        """
-        raise NotImplementedError
+if __name__ == "__main__":
+    pb = PyxivBrowser(
+        {
+            "http": "http://127.0.0.1:10809",
+            "https": "http://127.0.0.1:10809"
+        },
+        {
+            "PHPSESSID": "xxx",
+        },
+    )
+    print(pb._get_csrf_token())
