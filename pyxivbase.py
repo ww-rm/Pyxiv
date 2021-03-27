@@ -489,13 +489,17 @@ class PyxivBrowser:
 
 
 if __name__ == "__main__":
-    pb = PyxivBrowser(
-        {
-            "http": "http://127.0.0.1:10809",
-            "https": "http://127.0.0.1:10809"
-        },
-        {
-            "PHPSESSID": "xxx",
-        },
-    )
-    print(pb._get_csrf_token())
+    pass
+    # browser = PyxivBrowser(
+    #     {
+    #         "http": "http://127.0.0.1:10809",
+    #         "https": "http://127.0.0.1:10809"
+    #     },
+    #     {
+    #         "PHPSESSID": "xxx",
+    #     },
+    # )
+    # browser.get_logout()
+
+    # db = PyxivDatabase("./pyxiv.db")
+    # print(db("SELECT * FROM illust LIMIT 1000;"))

@@ -16,8 +16,8 @@ class PyxivSpider:
         download_*: download specifed pictures to local path
     """
 
-    def __init__(self, config: PyxivConfig):
-        self.config = config
+    def __init__(self, config_path):
+        self.config = PyxivConfig(config_path)
         self.browser = PyxivBrowser(self.config.proxies, self.config.cookies)
         self.db = PyxivDatabase(self.config.db_path)
 
@@ -559,8 +559,7 @@ class PyxivSpider:
 
 
 if __name__ == "__main__":
-    config = PyxivConfig("./config.json")
-    spider = PyxivSpider(config)
-    r = spider.search_cache(["イラストリアス", "アズールレーン"])
-    print(len(r))
-    # spider.download_illusts([row[0] for row in r], "./image/光辉")
+    pass
+    # spider = PyxivSpider("./config.json")
+    # spider.download_ranking("./top50")
+    

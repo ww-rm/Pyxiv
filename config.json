@@ -4,10 +4,7 @@
         "https": "http://127.0.0.1:10809"
     },
     "cookies": {
-        "PHPSESSID": "",
-        "device_token": "",
-        "privacy_policy_agreement": "2"
+        "PHPSESSID": "xxx"
     },
-    "db_path": "data/db/pyxiv.db",
-    "save_path": "data/db/image/"
+    "db_path": "./pyxiv.db"
 }
