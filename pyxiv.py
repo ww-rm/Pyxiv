@@ -24,6 +24,113 @@ class PyxivSpider:
     # Save methods begin here
     # Used to save metadata to database, without downloading real pictures
 
+    def search_cache(self, keywords: list = None, scope="tag", mode="all", match="fuzzy", query="and", order="like"):
+        """Search database for cache result
+
+        Args:
+            keywords: A list contain keywords to search, can be None or empty list for all result
+            scope: "tag", "titledesc", "all"
+            mode: "safe", "r18", "all"
+            match: "fuzzy", "exactly"
+            query: "and", "or"
+            order: "like", "bookmark", "view"
+
+        Returns:
+            A list consist of two-tuples, like (illust_id, key), where key is specified by order
+        """
+
+        # check value
+        scope_values = ["tag", "titledesc", "all"]
+        mode_values = ["safe", "r18", "all"]
+        match_values = ["fuzzy", "exactly"]
+        query_values = ["and", "or"]
+        order_values = ["like", "bookmark", "view"]
+        if scope not in scope_values:
+            raise ValueError("Incorrect scope value: {}".format(scope))
+        if mode not in mode_values:
+            raise ValueError("Incorrect mode value: {}".format(mode))
+        if match not in match_values:
+            raise ValueError("Incorrect match value: {}".format(match))
+        if query not in query_values:
+            raise ValueError("Incorrect query value: {}".format(query))
+        if order not in order_values:
+            raise ValueError("Incorrect order value: {}".format(order))
+
+        # prepare for sql command
+        o_value = {
+            "like": "like_count",
+            "bookmark": "bookmark_count",
+            "view": "view_count"
+        }
+        m_where = {
+            "fuzzy": {
+                "tag": " (name LIKE ?) ",
+                "td": " (title LIKE ? OR description LIKE ?) "
+            },
+            "exactly": {
+                "tag": " (name = ?) ",
+                "td": " (title = ? OR description = ?) "
+            }
+        }
+
+        # fuzzy query
+        if match == "fuzzy":
+            keywords = ["%"+e+"%" for e in keywords]
+
+        # sql command
+        sql_full = "SELECT id, {order} FROM illust;".format(order=o_value[order])
+        sql_tag = "SELECT DISTINCT id, {order} FROM illust JOIN tag ON illust.id = tag.illust_id WHERE {where};".format(
+            order=o_value[order],
+            where=m_where[match]["tag"])
+        sql_td = "SELECT id, {order} FROM illust WHERE {where};".format(
+            order=o_value[order],
+            where=m_where[match]["td"]
+        )
+        sql_r18 = "SELECT DISTINCT illust_id, {order} FROM illust JOIN tag ON illust.id = tag.illust_id WHERE name = 'R-18';".format(order=o_value[order])
+
+        result_set = set(self.db(sql_full))
+
+        # get tag and td sets
+        if keywords:
+            tag_sets = []
+            td_sets = []
+            for keyword in keywords:
+                tag_sets.append(set(self.db(sql_tag, (keyword,))))
+                td_sets.append(set(self.db(sql_td, (keyword, keyword))))
+            tag_set = tag_sets[0].copy()
+            td_set = td_sets[0].copy()
+
+            # keywords AND or OR
+            if query == "and":
+                for set_ in tag_sets:
+                    tag_set.intersection_update(set_)
+                for set_ in td_sets:
+                    td_set.intersection_update(set_)
+            else:
+                for set_ in tag_sets:
+                    tag_set.update(set_)
+                for set_ in td_sets:
+                    td_set.update(set_)
+
+            # {full} intersect ({tag} union {td})
+            if scope == "tag":
+                result_set.intersection_update(tag_set)
+            elif scope == "titledesc":
+                result_set.intersection_update(td_set)
+            else:
+                result_set.intersection_update(tag_set.union(td_set))
+
+        # except or intersect R18 set
+        r18_set = set(self.db(sql_r18))
+        if mode == "safe":
+            result_set.difference_update(r18_set)
+        elif mode == "r18":
+            result_set.intersection_update(r18_set)
+
+        # descend result set
+        result = sorted(result_set, key=lambda e: e[1], reverse=True)
+        return result
+
     @wrapper.log_calling_info()
     def save_illust(self, illust_id) -> bool:
         """Store or update full information of an illust, may affect all tables in database
@@ -405,12 +512,12 @@ class PyxivSpider:
 
         Args:
             p: page number, >= 1
-            content: 
+            content:
                 "all": mode[Any]
                 "illust": mode["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie"]
                 "ugoira"(動イラスト): mode["daily", "weekly", "daily_r18", "weekly_r18"]
                 "manga": mode["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie"]
-            mode: ["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie", 
+            mode: ["daily", "weekly", "daily_r18", "weekly_r18", "monthly", "rookie",
                 "original", "male", "male_r18", "female", "female_r18"]
             date: ranking date, example: 20210319, None means the newest
 
@@ -423,193 +530,37 @@ class PyxivSpider:
             for illust_id in illust_ids:
                 self.download_illust(illust_id, save_dir)
 
-    def download_illusts(self, illust_ids, save_dir, bookmark_illust=False):
-        """download illusts, aimed to fit indexer"""
+    def download_search_illustrations(self, save_dir):
         raise NotImplementedError
 
-
-class PyxivIndexer:
-    """
-    Attrs:
-        scope: search scope, in tag, or title and description, or in all
-        mode: search mode, safe or r18 or both
-        query: search match fuzzy or exactly
-        include: whether use AND or OR to process query keywords
-        order: result order by, always descending
-    """
-    # search scope
-    S_TAG = 0
-    S_TD = 1
-    S_ALL = 2
-
-    # search mode
-    M_SAFE = 0
-    M_R18 = 1
-    M_ALL = 2
-
-    # search
-    Q_FUZZY = 0
-    Q_EXACTLY = 1
-
-    # include mode
-    I_AND = 0
-    I_OR = 1
-
-    # order by
-    O_LIKE = 0
-    O_BOOKMARK = 1
-    O_VIEW = 2
-
-    def __init__(self, db_path):
-        self.__scope = PyxivIndexer.S_ALL
-        self.__mode = PyxivIndexer.M_ALL
-        self.__query = PyxivIndexer.Q_FUZZY
-        self.__include = PyxivIndexer.I_OR
-        self.__order = PyxivIndexer.O_LIKE
-        self.db = PyxivDatabase(db_path)
-
-    @property
-    def scope(self):
-        return self.__scope
-
-    @scope.setter
-    def scope(self, value):
-        if value in (PyxivIndexer.S_TAG, PyxivIndexer.S_TD, PyxivIndexer.S_ALL):
-            self.__scope = value
-        else:
-            raise ValueError("Unknown scope value: {}".format(value))
-
-    @property
-    def mode(self):
-        return self.__mode
-
-    @mode.setter
-    def mode(self, value):
-        if value in (PyxivIndexer.M_SAFE, PyxivIndexer.M_R18, PyxivIndexer.M_ALL):
-            self.__mode = value
-        else:
-            raise ValueError("Unknown mode value: {}".format(value))
-
-    @property
-    def query(self):
-        return self.__query
-
-    @query.setter
-    def query(self, value):
-        if value in (PyxivIndexer.Q_FUZZY, PyxivIndexer.Q_EXACTLY):
-            self.__query = value
-        else:
-            raise ValueError("Unknown query value: {}".format(value))
-
-    @property
-    def include(self):
-        return self.__include
-
-    @include.setter
-    def include(self, value):
-        if value in (PyxivIndexer.I_AND, PyxivIndexer.I_OR):
-            self.__include = value
-        else:
-            raise ValueError("Unknown include value: {}".format(value))
-
-    @property
-    def order(self):
-        return self.__order
-
-    @order.setter
-    def order(self, value):
-        if value in (PyxivIndexer.O_LIKE, PyxivIndexer.O_BOOKMARK, PyxivIndexer.O_VIEW):
-            self.__order = value
-        else:
-            raise ValueError("Unknown order value: {}".format(value))
-
-    def search(self, includes: list) -> list:
-        """search specified illusts
+    def download_illusts(self, illust_ids, save_dir, bookmark_illusts: bool = False, bookmark_users: bool = False):
+        """Download illusts, aimed to fit indexer
 
         Args:
-            includes: a list includes texts you want to search
-
-        Returns:
-            A list consist of two-tuples, like (illust_id, key), where key is specified by order property
+            illust_ids: list of illust ids to download, will first get metadata to database if any not in database
+            save_dir: save dir
+            bookmark_illusts: whether add bookmarks to all illusts downloaded
+            bookmark_users: whether add bookmarks to all users of illusts downloaded
         """
+        success_ids = []
+        for illust_id in illust_ids:
+            if self.download_illust(illust_id, save_dir):
+                success_ids.append(illust_id)
 
-        o_value = {
-            PyxivIndexer.O_LIKE: "like_count",
-            PyxivIndexer.O_BOOKMARK: "bookmark_count",
-            PyxivIndexer.O_VIEW: "view_count"
-        }
-        q_where = {
-            PyxivIndexer.Q_FUZZY: {
-                "tag": " (name LIKE ?) ",
-                "td": " (title LIKE ? OR description LIKE ?) "
-            },
-            PyxivIndexer.Q_EXACTLY: {
-                "tag": " (name = ?) ",
-                "td": " (title = ? OR description = ?) "
-            }
-        }
-
-        # fuzzy query
-        if self.query == PyxivIndexer.Q_FUZZY:
-            includes = ["%"+e+"%" for e in includes]
-
-        # sql command
-        sql_full = "SELECT id, {order} FROM illust;".format(order=o_value[self.order])
-        sql_tag = "SELECT DISTINCT id, {order} FROM illust JOIN tag ON illust.id = tag.illust_id WHERE {where};".format(
-            order=o_value[self.order],
-            where=q_where[self.query]["tag"])
-        sql_td = "SELECT id, {order} FROM illust WHERE {where};".format(
-            order=o_value[self.order],
-            where=q_where[self.query]["td"]
-        )
-        sql_r18 = "SELECT DISTINCT illust_id FROM tag WHERE name = 'R-18';"
-
-        result_set = set(self.db(sql_full))
-
-        # get tag and td sets
-        if includes:
-            tag_sets = []
-            td_sets = []
-            for name in includes:
-                tag_sets.append(set(self.db(sql_tag, (name,))))
-                td_sets.append(set(self.db(sql_td, (name, name))))
-            tag_set = tag_sets[0].copy()
-            td_set = td_sets[0].copy()
-
-            # keywords AND or OR
-            if self.include == PyxivIndexer.I_AND:
-                for set_ in tag_sets:
-                    tag_set.intersection_update(set_)
-                for set_ in td_sets:
-                    td_set.intersection_update(set_)
-            else:
-                for set_ in tag_sets:
-                    tag_set.update(set_)
-                for set_ in td_sets:
-                    td_set.update(set_)
-
-            # {full} intersect ({tag} union {td})
-            if self.scope == PyxivIndexer.S_TAG:
-                result_set.intersection_update(tag_set)
-            elif self.scope == PyxivIndexer.S_TD:
-                result_set.intersection_update(td_set)
-            else:
-                result_set.intersection_update(tag_set.union(td_set))
-
-        # except or intersect R18 set
-        r18_set = set(self.db(sql_r18))
-        if self.mode == PyxivIndexer.M_SAFE:
-            result_set.difference_update(r18_set)
-        elif self.mode == PyxivIndexer.M_R18:
-            result_set.intersection_update(r18_set)
-
-        # descend result set
-        result = sorted(result_set, key=lambda e: e[1], reverse=True)
-        return result
+        illusts_info = []
+        for illust_id in success_ids:
+            illusts_info.extend(self.db("SELECT id, user_id FROM illust WHERE id = ?;", (illust_id,)))
+        if bookmark_illusts:
+            for illust_id, _ in illusts_info:
+                self.browser.post_illusts_bookmarks_add(illust_id)
+        if bookmark_users:
+            for _, user_id in illusts_info:
+                self.browser.post_bookmark_add(user_id)
 
 
 if __name__ == "__main__":
-    a = PyxivIndexer("./data/db/pyxiv.db")
-    r = a.search(["アズールレーン"])
-    print(len(a.db))
+    config = PyxivConfig("./config.json")
+    spider = PyxivSpider(config)
+    r = spider.search_cache(["イラストリアス", "アズールレーン"])
     print(len(r))
+    # spider.download_illusts([row[0] for row in r], "./image/光辉")
