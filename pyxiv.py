@@ -296,15 +296,16 @@ class PyxivSpider:
     def _get_user_id_by_followings(self, user_id) -> list:
         """Return: [int(id), ...]"""
         # be sure all followings are retrieved
-        user_followings = []  # int(id)
+        user_followings = []
         i = 0
-        user_following = self.browser.get_user_following(user_id, i)
+        user_following = self.browser.get_user_following(user_id, i).get("users")
         while user_following:
             for user in user_following:
-                user_followings.append(int(user.get("userId")))  # int id
+                user_followings.append(user.get("userId"))
             # try to gey next 50 followings
             i += 50
-            user_following = self.browser.get_user_following(user_id, i)
+            user_following = self.browser.get_user_following(user_id, i).get("users")
+        # print(len(user_followings))
         return user_followings
 
     def _get_user_id_by_recommends(self, user_id) -> list:
@@ -312,10 +313,10 @@ class PyxivSpider:
         # retrieve 100 recommends
         user_recommends = self.browser.get_user_recommends(user_id)
         if user_recommends:
-            user_recommends = [int(user.get("userId")) for user in user_recommends.get("users")]  # int id
+            user_recommends = [user.get("userId") for user in user_recommends.get("users")]
         else:
             user_recommends = []
-
+        # print(len(user_recommends))
         return user_recommends
 
     def _crawl_by_user(self, f_expand, seed_user_ids: set, max_user_num: int):
@@ -353,11 +354,14 @@ class PyxivSpider:
         while len(seed_user_ids) > 0 and len(saved_user_ids) < max_user_num:
             user_id = seed_user_ids.pop()
 
+            # print(seed_user_ids, saved_user_ids, exist_user_ids)
+            # breakpoint()
+
             # add new_user_ids to seed_user_ids
             # and limit the length of seed_user_ids
             if len(seed_user_ids) < 1000000:
                 seed_user_ids.update(
-                    set(f_expand(user_id))
+                    set(map(int, f_expand(user_id)))  # be sure int id
                     .difference(exist_user_ids)
                     .difference(saved_user_ids)
                 )
@@ -437,7 +441,7 @@ class PyxivSpider:
                 illust_recommend_init = self.browser.get_illust_recommend_init(illust_id)
                 if illust_recommend_init:
                     seed_illust_ids.update(
-                        set(map(int, illust_recommend_init.get("details")))  # actually a dict or empty list
+                        set(map(int, illust_recommend_init.get("details")))  # actually a dict or empty list # be sure int id
                         .difference(exist_illust_ids)
                         .difference(saved_illust_ids)
                     )
