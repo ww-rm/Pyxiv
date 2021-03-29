@@ -298,14 +298,13 @@ class PyxivSpider:
         # be sure all followings are retrieved
         user_followings = []
         i = 0
-        user_following = self.browser.get_user_following(user_id, i).get("users")
-        while user_following:
-            for user in user_following:
+        user_following = self.browser.get_user_following(user_id, i)
+        while user_following and user_following.get("users"):  # non-empty return and non-empty users list
+            for user in user_following.get("users"):
                 user_followings.append(user.get("userId"))
             # try to gey next 50 followings
             i += 50
-            user_following = self.browser.get_user_following(user_id, i).get("users")
-        # print(len(user_followings))
+            user_following = self.browser.get_user_following(user_id, i)  # next followings
         return user_followings
 
     def _get_user_id_by_recommends(self, user_id) -> list:
@@ -316,7 +315,6 @@ class PyxivSpider:
             user_recommends = [user.get("userId") for user in user_recommends.get("users")]
         else:
             user_recommends = []
-        # print(len(user_recommends))
         return user_recommends
 
     def _crawl_by_user(self, f_expand, seed_user_ids: set, max_user_num: int):
@@ -353,9 +351,6 @@ class PyxivSpider:
         # for each seed user id, get its expand user ids
         while len(seed_user_ids) > 0 and len(saved_user_ids) < max_user_num:
             user_id = seed_user_ids.pop()
-
-            # print(seed_user_ids, saved_user_ids, exist_user_ids)
-            # breakpoint()
 
             # add new_user_ids to seed_user_ids
             # and limit the length of seed_user_ids
