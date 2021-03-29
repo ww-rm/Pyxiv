@@ -437,7 +437,7 @@ class PyxivSpider:
                 illust_recommend_init = self.browser.get_illust_recommend_init(illust_id)
                 if illust_recommend_init:
                     seed_illust_ids.update(
-                        set(illust_recommend_init.get("details"))  # actually a dict or empty list
+                        set(map(int, illust_recommend_init.get("details")))  # actually a dict or empty list
                         .difference(exist_illust_ids)
                         .difference(saved_illust_ids)
                     )
@@ -562,4 +562,3 @@ if __name__ == "__main__":
     pass
     # spider = PyxivSpider("./config.json")
     # spider.download_ranking("./top50")
-    
