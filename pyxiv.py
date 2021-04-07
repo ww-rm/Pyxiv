@@ -73,10 +73,6 @@ class PyxivSpider:
             }
         }
 
-        # fuzzy query
-        if match == "fuzzy":
-            keywords = ["%"+e+"%" for e in keywords]
-
         # sql command
         sql_full = "SELECT id, {order} FROM illust;".format(order=o_value[order])
         sql_tag = "SELECT DISTINCT id, {order} FROM illust JOIN tag ON illust.id = tag.illust_id WHERE {where};".format(
@@ -86,12 +82,16 @@ class PyxivSpider:
             order=o_value[order],
             where=m_where[match]["td"]
         )
-        sql_r18 = "SELECT DISTINCT illust_id, {order} FROM illust JOIN tag ON illust.id = tag.illust_id WHERE name = 'R-18';".format(order=o_value[order])
+        sql_r18 = "SELECT id, {order} FROM illust WHERE x_restrict > 0;".format(order=o_value[order])
 
         result_set = set(self.db(sql_full))
 
         # get tag and td sets
         if keywords:
+            # fuzzy query
+            if match == "fuzzy":
+                keywords = ["%"+e+"%" for e in keywords]
+
             tag_sets = []
             td_sets = []
             for keyword in keywords:
@@ -156,11 +156,12 @@ class PyxivSpider:
             bookmark_count = illust.get("bookmarkCount")
             like_count = illust.get("likeCount")
             view_count = illust.get("viewCount")
+            x_restrict = illust.get("xRestrict")
             upload_date = illust.get("uploadDate")
             self.db.insert_illust(
                 illust_id, illust_title, illust_description,
                 bookmark_count, like_count, view_count,
-                user_id, upload_date
+                user_id, x_restrict, upload_date
             )
 
             # insert page
@@ -278,11 +279,12 @@ class PyxivSpider:
                 bookmark_count = illust.get("bookmarkCount")
                 like_count = illust.get("likeCount")
                 view_count = illust.get("viewCount")
+                x_restrict = illust.get("xRestrict")
                 upload_date = illust.get("uploadDate")
                 self.db.insert_illust(
                     illust_id, illust_title, illust_description,
                     bookmark_count, like_count, view_count,
-                    user_id, upload_date
+                    user_id, x_restrict, upload_date
                 )
                 # update tag
                 tags = [tag.get("tag") for tag in illust.get("tags").get("tags")]
@@ -556,8 +558,13 @@ class PyxivSpider:
             for _, user_id in illusts_info:
                 self.browser.post_bookmark_add(user_id)
 
+        print("Total: {}".format(len(illust_ids)))
+        print("Success: {}".format(len(success_ids)))
+
 
 if __name__ == "__main__":
     pass
     # spider = PyxivSpider("./config.json")
+    # rows = spider.search_cache(["女の子"], mode="r18")
+    # print(len(rows))
     # spider.download_ranking("./top50")

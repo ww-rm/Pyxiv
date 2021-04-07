@@ -35,6 +35,7 @@ class PyxivDatabase:
             "like_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
             "view_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
             "user_id" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+            "x_restrict" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
             "upload_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
             "last_update_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
             PRIMARY KEY ("id") ON CONFLICT REPLACE,
@@ -99,6 +100,7 @@ class PyxivDatabase:
                     "like_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
                     "view_count" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
                     "user_id" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
+                    "x_restrict" integer NOT NULL ON CONFLICT REPLACE DEFAULT 0,
                     "upload_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
                     "last_update_date" TEXT NOT NULL ON CONFLICT REPLACE DEFAULT '2000-01-01T12:00:00+00:00',
                     PRIMARY KEY ("id") ON CONFLICT REPLACE,
@@ -131,13 +133,13 @@ class PyxivDatabase:
         )
 
     @wrapper.database_operation()
-    def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id, upload_date):
+    def insert_illust(self, id_, title, description, bookmark_count, like_count, view_count, user_id, x_restrict, upload_date):
         self.connection.execute(
-            "INSERT INTO illust VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+            "INSERT INTO illust VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
             (
                 id_, title, description,
                 bookmark_count, like_count, view_count,
-                user_id, upload_date,
+                user_id, x_restrict, upload_date,
                 datetime.now(timezone(timedelta())).replace(microsecond=0).isoformat()
             )
         )
