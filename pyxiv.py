@@ -483,8 +483,8 @@ class PyxivSpider:
             if not self.save_illust(illust_id):
                 return False
         page_urls = [row[0] for row in self.db("SELECT url_original FROM page WHERE illust_id = ?;", (illust_id, ))]
-        tags = [row[0] for row in self.db("SELECT name FROM tag WHERE illust_id = ?", (illust_id,))]
-        if "R-18" in tags:
+        x_restrict, *_ = self.db("SELECT x_restrict FROM illust WHERE id = ?", (illust_id,))[0]
+        if x_restrict > 0:
             save_dir = PurePath(save_dir, "R-18")
         for page_url in page_urls:
             self.download_page(page_url, save_dir)
