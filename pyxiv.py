@@ -1,7 +1,7 @@
 import os
 import random
 from datetime import datetime, timedelta, timezone
-from pathlib import PurePath
+from pathlib import Path
 
 import wrapper
 from pyxivbase import PyxivBrowser, PyxivConfig, PyxivDatabase
@@ -465,7 +465,7 @@ class PyxivSpider:
         else:
             content = self.browser.get_page(page_url)
             if content:
-                with open(PurePath(save_dir, file_name), "wb") as f:
+                with open(Path(save_dir, file_name), "wb") as f:
                     f.write(content)
                 return True
             else:
@@ -485,7 +485,7 @@ class PyxivSpider:
         page_urls = [row[0] for row in self.db("SELECT url_original FROM page WHERE illust_id = ?;", (illust_id, ))]
         x_restrict, *_ = self.db("SELECT x_restrict FROM illust WHERE id = ?", (illust_id,))[0]
         if x_restrict > 0:
-            save_dir = PurePath(save_dir, "R-18")
+            save_dir = Path(save_dir, "R-18")
         for page_url in page_urls:
             self.download_page(page_url, save_dir)
         return True
@@ -501,7 +501,7 @@ class PyxivSpider:
         if self.save_user(user_id):
             user_name = self.db("SELECT name FROM user WHERE id = ?;", (user_id,))[0][0]
             illust_ids = [row[0] for row in self.db("SELECT id FROM illust WHERE user_id = ?;", (user_id,))]
-            save_dir = PurePath(save_dir, "{}_{}".format(user_id, user_name))
+            save_dir = Path(save_dir, "{}_{}".format(user_id, user_name))
             for illust_id in illust_ids:
                 self.download_illust(illust_id, save_dir)
             return True
@@ -526,7 +526,7 @@ class PyxivSpider:
         """
         ranking = self.browser.get_ranking(p, content, mode, date)
         if ranking:
-            save_dir = PurePath(save_dir, "ranking_{}".format(ranking.get("date")))
+            save_dir = Path(save_dir, "ranking_{}".format(ranking.get("date")))
             illust_ids = [e.get("illust_id") for e in ranking.get("contents")]
             for illust_id in illust_ids:
                 self.download_illust(illust_id, save_dir)
