@@ -202,9 +202,9 @@ class PyxivBrowser:
 
     def __init__(self, proxies: dict = None, cookies: dict = None):
         self.session = requests.Session()
-        self.session.headers = PyxivBrowser.headers
+        self.session.headers.update(PyxivBrowser.headers)
         if proxies:
-            self.session.proxies = proxies
+            self.session.proxies.update(proxies)
         if cookies:
             for name, value in cookies.items():
                 self.session.cookies.set(name, value, domain=".pixiv.net", path="/")
