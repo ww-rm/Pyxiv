@@ -20,10 +20,10 @@ def requests_alter(alter_dict: dict = None):
         def decorated_func(self, method, url, *args, **kwargs):
             _url = urlparse(url)
             if _url.netloc in alter_dict:
-                url = urlunparse(
+                url = urlunparse((
                     _url.scheme, alter_dict.get(_url.netloc, _url.netloc),
-                    _url.url, _url.params, _url.query, _url.fragment
-                )
+                    _url.path, _url.params, _url.query, _url.fragment
+                ))
                 kwargs["headers"] = kwargs.get("headers", {})
                 kwargs["headers"]["Host"] = _url.netloc
                 kwargs["verify"] = False

@@ -16,10 +16,16 @@ class PyxivSpider:
         download_*: download specifed pictures to local path
     """
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36",
+    }
+
     def __init__(self, config_path):
         self.config = PyxivConfig(config_path)
         self.browser = PyxivBrowser(self.config.proxies, self.config.cookies)
         self.db = PyxivDatabase(self.config.db_path)
+
+        self.browser.headers.update(self.headers)
 
     # Save methods begin here
     # Used to save metadata to database, without downloading real pictures
@@ -244,7 +250,7 @@ class PyxivSpider:
         """Update information of all illusts stored in database"""
 
         illust_ids = self.db("SELECT id, upload_date, last_update_date FROM illust")
-        now_date = datetime.now(timezone(timedelta())).replace(microsecond=0)
+        now_date = datetime.now(timezone(timedelta()))
         illust_ids_need_to_update = []
         for illust_id, upload_date, last_update_date in illust_ids:
             upload_date = datetime.fromisoformat(upload_date)

@@ -1,7 +1,7 @@
 import json
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from time import sleep
 
 import bs4
@@ -142,7 +142,7 @@ class PyxivDatabase:
                 id_, title, description,
                 bookmark_count, like_count, view_count,
                 user_id, x_restrict, upload_date,
-                datetime.now().isoformat(timespec="seconds")
+                datetime.now(timezone(timedelta())).isoformat(timespec="seconds")
             )
         )
 
