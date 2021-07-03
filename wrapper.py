@@ -4,6 +4,8 @@ import sys
 from functools import wraps
 from time import sleep
 from urllib.parse import urlparse, urlunparse
+import warnings
+from urllib3.exceptions import InsecureRequestWarning
 
 
 def requests_alter(alter_dict: dict = None):
@@ -27,7 +29,9 @@ def requests_alter(alter_dict: dict = None):
                 kwargs["headers"] = kwargs.get("headers", {})
                 kwargs["headers"]["Host"] = _url.netloc
                 kwargs["verify"] = False
-            return func(self, method, url, *args, **kwargs)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", InsecureRequestWarning)
+                return func(self, method, url, *args, **kwargs)
         return decorated_func
     return decorator
 
