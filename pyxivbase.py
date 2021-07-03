@@ -1,6 +1,8 @@
 import json
+import logging
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from time import sleep
 
 import bs4
 import requests
@@ -140,7 +142,7 @@ class PyxivDatabase:
                 id_, title, description,
                 bookmark_count, like_count, view_count,
                 user_id, x_restrict, upload_date,
-                datetime.now(timezone(timedelta())).replace(microsecond=0).isoformat()
+                datetime.now().isoformat(timespec="seconds")
             )
         )
 
@@ -159,10 +161,12 @@ class PyxivDatabase:
         )
 
 
-class PyxivBrowser:
+class PyxivBrowser(requests.Session):
     # lang=zh
-    # 获取所有illust的id
     url_host = "https://www.pixiv.net"
+
+    # api
+    api_login = "https://accounts.pixiv.net/api/login"
 
     # ajax
 
@@ -189,61 +193,63 @@ class PyxivBrowser:
     ajax_illusts_bookmarks_add = "https://www.pixiv.net/ajax/illusts/bookmarks/add"  # comment:"" illust_id:"" restrict:0 tags:[]
 
     # php
-    php_login = ""
     php_logout = "https://www.pixiv.net/logout.php"  # ?return_to=%2F
     php_ranking = "https://www.pixiv.net/ranking.php"  # ?format=json&p=1&mode=daily&content=all
     php_rpc_recommender = "https://www.pixiv.net/rpc/recommender.php"  # ?type=illust&sample_illusts=88548686&num_recommendations=500
     php_bookmark_add = "https://www.pixiv.net/bookmark_add.php"  # mode:"add" type:"user" user_id:"" tag:"" restrict:"" format:"json"
 
-    headers = {
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36",
-        "referer": url_host
-    }
+    def __init__(self, proxies: dict = None, cookies: dict = None, interval: float = 0.01) -> None:
+        """
+        Args:
+            interval: Seconds between each request. Default to 0.1
+        """
+        super().__init__()
+        self.interval = interval or 0.01
+        self.logger = logging.getLogger(__name__)
 
-    def __init__(self, proxies: dict = None, cookies: dict = None):
-        self.session = requests.Session()
-        self.session.headers.update(PyxivBrowser.headers)
         if proxies:
-            self.session.proxies.update(proxies)
+            self.proxies.update(proxies)
         if cookies:
             for name, value in cookies.items():
-                self.session.cookies.set(name, value, domain=".pixiv.net", path="/")
-        # print(self.session.cookies.list_domains())
-        # print(self.session.proxies)
-        # print(self.session.cookies)
+                self.cookies.set(name, value, domain=".pixiv.net", path="/")
+        self.headers["Referer"] = self.url_host
+        # print(self.cookies)
 
-    def __del__(self):
-        self.session.close()
+    def request(self, method, url, *args, **kwargs) -> requests.Response:
+        try:
+            sleep(self.interval)
+            return super().request(method, url, *args, **kwargs)
+        except Exception as e:
+            self.logger.error("{}:{}".format(url, e))
+            return requests.Response()
 
-    @wrapper.browser_get()
-    def _get_csrf_token(self):
+    def _get_csrf_token(self) -> str:
         """Get x-csrf-token"""
-        html = self.session.get(PyxivBrowser.url_host).text
+        html = self.get(self.url_host).text
         soup = bs4.BeautifulSoup(html, "lxml")
-        token = json.loads(soup.find("meta", {"id": "meta-global-data"}).attrs.get("content")).get("token")
+        token = json.loads(soup.find("meta", {"id": "meta-global-data"}).attrs.get("content", "{}")).get("token", "")
         return token
 
     # GET method
 
-    @wrapper.browser_get()
+    @wrapper.empty_retry()
     def get_page(self, page_url) -> bytes:
-        response = self.session.get(page_url)
+        response = self.get(page_url)
         if response.status_code != 200:
+            self.logger.warning("pixiv:Failed to download from {}".format(page_url))
             return b""
         return response.content
 
     @wrapper.cookies_required()
-    @wrapper.browser_get()
     def get_top_illust(self, mode="all") -> dict:
         """Get top illusts by mode
 
         Args:
             mode: "all" means all ages, "r18" means R-18 only
         """
-        json_ = self.session.get(PyxivBrowser.ajax_top_illust, params={"mode": mode}).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        json_ = self.get(self.ajax_top_illust, params={"mode": mode}).json()
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_search_artworks(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="all") -> dict:
         """Get search artworks result
 
@@ -254,8 +260,8 @@ class PyxivBrowser:
             s_mode: "s_tag" partly match tag, "s_tag_full" exactly match tag, "s_tc" match title and character description
             type_: No need to care
         """
-        json_ = self.session.get(
-            PyxivBrowser.ajax_search_artworks.format(keyword=keyword),
+        json_ = self.get(
+            self.ajax_search_artworks.format(keyword=keyword),
             params={
                 "order": order,
                 "mode": mode,
@@ -263,9 +269,8 @@ class PyxivBrowser:
                 "s_mode": s_mode,
                 "type": type_
             }).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_search_illustrations(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="illust") -> dict:
         """Get search illustration or ugoira result
 
@@ -276,8 +281,8 @@ class PyxivBrowser:
             s_mode: "s_tag" partly match tag, "s_tag_full" exactly match tag, "s_tc" match title and character description
             type_: "illust", "ugoira", "illust_and_ugoira"
         """
-        json_ = self.session.get(
-            PyxivBrowser.ajax_search_illustrations.format(keyword=keyword),
+        json_ = self.get(
+            self.ajax_search_illustrations.format(keyword=keyword),
             params={
                 "order": order,
                 "mode": mode,
@@ -285,9 +290,8 @@ class PyxivBrowser:
                 "s_mode": s_mode,
                 "type": type_
             }).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_search_manga(self, keyword, order="date_d", mode="all", p=1, s_mode="s_tag", type_="manga") -> dict:
         """Get search manga result
 
@@ -298,8 +302,8 @@ class PyxivBrowser:
             s_mode: "s_tag" partly match tag, "s_tag_full" exactly match tag, "s_tc" match title and character description
             type_: No need to care
         """
-        json_ = self.session.get(
-            PyxivBrowser.ajax_search_manga.format(keyword=keyword),
+        json_ = self.get(
+            self.ajax_search_manga.format(keyword=keyword),
             params={
                 "order": order,
                 "mode": mode,
@@ -307,34 +311,29 @@ class PyxivBrowser:
                 "s_mode": s_mode,
                 "type": type_
             }).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_illust(self, illust_id) -> dict:
-        json_ = self.session.get(PyxivBrowser.ajax_illust.format(illust_id=illust_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        json_ = self.get(self.ajax_illust.format(illust_id=illust_id)).json()
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_illust_pages(self, illust_id) -> list:
-        json_ = self.session.get(PyxivBrowser.ajax_illust_pages.format(illust_id=illust_id)).json()
-        return [] if json_.get("error") is True else json_.get("body")
+        json_ = self.get(self.ajax_illust_pages.format(illust_id=illust_id)).json()
+        return [] if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_illust_recommend_init(self, illust_id, limit=1) -> dict:
         """details.keys()"""
-        json_ = self.session.get(
-            PyxivBrowser.ajax_illust_recommend_init.format(illust_id=illust_id),
+        json_ = self.get(
+            self.ajax_illust_recommend_init.format(illust_id=illust_id),
             params={"limit": limit}
         ).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_user(self, user_id) -> dict:
-        json_ = self.session.get(PyxivBrowser.ajax_user.format(user_id=user_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        json_ = self.get(self.ajax_user.format(user_id=user_id)).json()
+        return {} if json_["error"] is True else json_["body"]
 
     @wrapper.cookies_required()
-    @wrapper.browser_get()
     def get_user_following(self, user_id, offset, limit=50, rest="show") -> dict:
         """Get following list of a user
 
@@ -346,14 +345,13 @@ class PyxivBrowser:
         Returns:
             The list is body.users
         """
-        json_ = self.session.get(
-            PyxivBrowser.ajax_user_following.format(user_id=user_id),
+        json_ = self.get(
+            self.ajax_user_following.format(user_id=user_id),
             params={"offset": offset, "limit": limit if limit < 90 else 90, "rest": rest}
         ).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return {} if json_["error"] is True else json_["body"]
 
     @wrapper.cookies_required()
-    @wrapper.browser_get()
     def get_user_recommends(self, user_id, userNum=100, workNum=3, isR18=True) -> dict:
         """Get recommends of a user
 
@@ -365,23 +363,20 @@ class PyxivBrowser:
         Returns:
             Recommends list is body.recommendUsers, the length of list <= userNum
         """
-        json_ = self.session.get(
-            PyxivBrowser.ajax_user_recommends.format(user_id=user_id),
+        json_ = self.get(
+            self.ajax_user_recommends.format(user_id=user_id),
             params={"userNum": userNum, "workNum": workNum, "isR18": isR18}
         ).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_user_profile_all(self, user_id) -> dict:
-        json_ = self.session.get(PyxivBrowser.ajax_user_profile_all.format(user_id=user_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        json_ = self.get(self.ajax_user_profile_all.format(user_id=user_id)).json()
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_user_profile_top(self, user_id) -> dict:
-        json_ = self.session.get(PyxivBrowser.ajax_user_profile_top.format(user_id=user_id)).json()
-        return {} if json_.get("error") is True else json_.get("body")
+        json_ = self.get(self.ajax_user_profile_top.format(user_id=user_id)).json()
+        return {} if json_["error"] is True else json_["body"]
 
-    @wrapper.browser_get()
     def get_ranking(self, p=1, content="all", mode="daily", date: str = None) -> dict:
         """Get ranking, limit 50 illusts info in one page
 
@@ -398,14 +393,13 @@ class PyxivBrowser:
 
         Note: May need cookies to get r18 ranking
         """
-        json_ = self.session.get(
-            PyxivBrowser.php_ranking,
+        json_ = self.get(
+            self.php_ranking,
             params={"format": "json", "p": p, "content": content, "mode": mode, "date": date}
         ).json()
-        return {} if json_.get("error") else json_
+        return {} if "error" in json_ else json_
 
     @wrapper.cookies_required()
-    @wrapper.browser_get()
     def get_rpc_recommender(self, sample_illusts: int, num_recommendations=500, type_="illust") -> list:
         """Deprecated, used to get recommended illust ids
 
@@ -414,26 +408,28 @@ class PyxivBrowser:
             num_recommendations: recommend illusts number
             type_: no need to care
         """
-        json_ = self.session.get(
-            PyxivBrowser.php_rpc_recommender,
+        json_ = self.get(
+            self.php_rpc_recommender,
             params={
                 "sample_illusts": sample_illusts,
                 "num_recommendations": num_recommendations,
                 "type": type_
             }
         ).json()
-        return [] if json_.get("error") else json_.get("recommendations")
+        return [] if "error" in json_ else json_["recommendations"]
 
-    @wrapper.browser_post()
     def get_logout(self) -> bool:
         """Logout"""
-        response = self.session.get(PyxivBrowser.php_logout, params={"return_to": "/"})
+        response = self.get(self.php_logout, params={"return_to": "/"})
         return True
 
     # POST method
 
+    def post_login(self, usrn, pwd, source="pc") -> bool:
+        # TODO: captcha arguments
+        raise NotImplementedError
+
     @wrapper.cookies_required()
-    @wrapper.browser_post()
     def post_illusts_bookmarks_add(self, illust_id, restrict: int = 0, comment: str = "", tags: list = None) -> bool:
         """Add or modify bookmark of an illust
 
@@ -444,25 +440,21 @@ class PyxivBrowser:
             tags: a list contains string tags, can be empty list
         """
 
-        json_ = self.session.post(
-            PyxivBrowser.ajax_illusts_bookmarks_add,
-            data=json.dumps(
-                {
-                    "illust_id": illust_id,
-                    "restrict": restrict,
-                    "comment": comment,
-                    "tags": tags
-                }
-            ),
+        json_ = self.post(
+            self.ajax_illusts_bookmarks_add,
+            json={
+                "illust_id": illust_id,
+                "restrict": restrict,
+                "comment": comment,
+                "tags": tags
+            },
             headers={
-                "Content-Type": "application/json; charset=utf-8",  # 422
                 "x-csrf-token": self._get_csrf_token()  # 400
             }
         ).json()
-        return False if json_.get("error") else True
+        return False if "error" in json_ else True
 
     @wrapper.cookies_required()
-    @wrapper.browser_post()
     def post_bookmark_add(self, user_id, restrict=0, tag="", mode="add", type_="user") -> bool:
         """Add or modify bookmark of a user
 
@@ -473,8 +465,8 @@ class PyxivBrowser:
             mode: No need to care
             type_: No need to care
         """
-        response = self.session.post(
-            PyxivBrowser.php_bookmark_add,
+        response = self.post(
+            self.php_bookmark_add,
             data={
                 "user_id": user_id,
                 "restrict": restrict,

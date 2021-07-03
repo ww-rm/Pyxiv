@@ -1,42 +1,31 @@
-import random
+import logging
 import sqlite3
 import sys
 from functools import wraps
 from time import sleep
 
 
-def browser_get(log_file=sys.stderr, max_sleep_seconds=1):
-    def decorator(method):
-        @wraps(method)
-        def decorated_method(self, *args, **kwargs):
-            sleep(0.1+random.random()*(max_sleep_seconds-0.1))
-            ret = None
-            try:
-                ret = method(self, *args, **kwargs)
-            except Exception as e:
-                print(e.__class__, e, file=log_file)
-            if not ret:
-                ret = None
-                print("Empty Get:{}:{}:{}".format(method.__name__, args, kwargs), file=log_file)
+def empty_retry(times=3, interval=1):
+    """Retry when a func returns empty
+
+    Args
+
+    times:
+        how many times to retry
+    interval:
+        interval between each retry, in seconds
+    """
+    def decorator(func):
+        @wraps(func)
+        def decorated_func(*args, **kwargs):
+            for _ in range(times):
+                ret = func(*args, **kwargs)
+                if ret:
+                    return ret
+                sleep(interval)
+            logging.getLogger(__name__).error("All retries failed in func {}.".format(func.__name__))
             return ret
-        return decorated_method
-    return decorator
-
-
-def browser_post(log_file=sys.stderr, max_sleep_seconds=1):
-    def decorator(method):
-        @wraps(method)
-        def decorated_method(self, *args, **kwargs):
-            ret_code = False
-            sleep(0.1+random.random()*(max_sleep_seconds-0.1))
-            try:
-                ret_code = method(self, *args, **kwargs)
-            except Exception as e:
-                print(e.__class__, e, file=log_file)
-            if not ret_code:
-                print("Failed Post:{}:{}:{}".format(method.__name__, args, kwargs), file=log_file)
-            return ret_code
-        return decorated_method
+        return decorated_func
     return decorator
 
 
@@ -45,7 +34,7 @@ def cookies_required():
     def decorator(method):
         @wraps(method)
         def decorated_method(self, *args, **kwargs):
-            if not self.session.cookies.get("PHPSESSID", domain=".pixiv.net", path="/"):
+            if not self.cookies.get("PHPSESSID", domain=".pixiv.net", path="/"):
                 raise PermissionError("Cookies not found!")
             else:
                 return method(self, *args, **kwargs)
@@ -65,15 +54,14 @@ def log_calling_info(log_file=sys.stdout):
     return decorator
 
 
-def database_operation(log_file=sys.stderr):
+def database_operation():
     def decorator(method):
         @wraps(method)
         def decorated_method(self, *args, **kwargs):
             try:
                 return method(self, *args, **kwargs)
             except sqlite3.Error as e:
-                print(e.__class__, e, file=log_file)
-                print("Failed to Execute:{}:{}:{}".format(method.__name__, args, kwargs), file=log_file)
+                logging.getLogger(__name__).error("Failed to Execute:{}:{}:{}".format(method.__name__, args, kwargs))
                 return []
         return decorated_method
     return decorator
