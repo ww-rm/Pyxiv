@@ -215,6 +215,7 @@ class PyxivBrowser(requests.Session):
         self.headers["Referer"] = self.url_host
         # print(self.cookies)
 
+    @wrapper.requests_alter()
     def request(self, method, url, *args, **kwargs) -> requests.Response:
         try:
             sleep(self.interval)

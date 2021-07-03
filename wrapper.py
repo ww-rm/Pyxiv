@@ -3,6 +3,33 @@ import sqlite3
 import sys
 from functools import wraps
 from time import sleep
+from urllib.parse import urlparse, urlunparse
+
+
+def requests_alter(alter_dict: dict = None):
+    """Change domain of a request with alter_dict mapping {"domain": "ip"}
+    """
+    alter_dict = alter_dict or {
+        "pixiv.net": "210.140.131.218",
+        "www.pixiv.net": "210.140.131.218",
+        "i.pximg.net": "210.140.92.142",
+    }
+
+    def decorator(func):
+        @wraps(func)
+        def decorated_func(self, method, url, *args, **kwargs):
+            _url = urlparse(url)
+            if _url.netloc in alter_dict:
+                url = urlunparse(
+                    _url.scheme, alter_dict.get(_url.netloc, _url.netloc),
+                    _url.url, _url.params, _url.query, _url.fragment
+                )
+                kwargs["headers"] = kwargs.get("headers", {})
+                kwargs["headers"]["Host"] = _url.netloc
+                kwargs["verify"] = False
+            return func(self, method, url, *args, **kwargs)
+        return decorated_func
+    return decorator
 
 
 def empty_retry(times=3, interval=1):
