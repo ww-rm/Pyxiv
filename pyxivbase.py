@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from time import sleep
@@ -218,7 +219,7 @@ class PyxivBrowser(requests.Session):
     @wrapper.requests_alter()
     def request(self, method, url, *args, **kwargs) -> requests.Response:
         try:
-            sleep(self.interval)
+            sleep(self.interval + random.random())
             return super().request(method, url, *args, **kwargs)
         except Exception as e:
             self.logger.error("{}:{}".format(url, e))
